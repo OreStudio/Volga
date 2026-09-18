@@ -14,6 +14,8 @@ import {
   countryPageSchema,
   changeReasonPageSchema,
   getImagesRequestSchema,
+  listImagesRequestSchema,
+  listImagesResponseSchema,
   getImagesResponseSchema,
   imageBytesToBuffer,
   countryHistoryRequestSchema,
@@ -536,6 +538,31 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         requiresCommentary: reason.requires_commentary,
         displayOrder: reason.display_order,
       })),
+    };
+  });
+
+  /**
+   * The images that can be chosen, without their bytes.
+   *
+   * A picker over six hundred flags must not fetch six hundred flags, so this
+   * returns metadata and the chosen one is fetched through the route below.
+   */
+  server.get('/api/images', async (request) => {
+    const session = requireSession(request);
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.listImages,
+      listImagesRequestSchema.parse({ modified_since: null }),
+      listImagesResponseSchema,
+    );
+    return {
+      images: response.images
+        .map((image) => ({
+          imageId: image.image_id,
+          key: image.key,
+          description: image.description,
+          sizeBytes: image.size_bytes,
+        }))
+        .sort((a, b) => a.key.localeCompare(b.key)),
     };
   });
 

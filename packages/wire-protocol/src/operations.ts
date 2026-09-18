@@ -24,6 +24,7 @@ export const SUBJECTS = {
   countryHistory: 'refdata.v1.countries.history',
   listChangeReasons: 'dq.v1.change_reasons.list',
   getImages: 'assets.v1.images.get',
+  listImages: 'assets.v1.images.list',
   httpInfo: 'http-server.v1.info.get',
 } as const;
 

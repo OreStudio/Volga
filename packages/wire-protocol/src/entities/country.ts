@@ -173,6 +173,14 @@ export interface CountryEdit {
   readonly version: number;
   readonly changeReasonCode: string;
   readonly changeCommentary: string;
+  /**
+   * The image, or null for none.
+   *
+   * Optional because a form that does not offer an image must not clear one: a
+   * save replaces the whole record, so silence here has to mean "unchanged"
+   * rather than "none".
+   */
+  readonly imageId?: string | null;
 }
 
 /**
@@ -184,6 +192,8 @@ export interface CountryEdit {
 export function applyEdit(current: WireCountry, edit: CountryEdit): WireCountry {
   return {
     ...current,
+    // Only touched when the form said something about it.
+    image_id: edit.imageId === undefined ? current.image_id : edit.imageId,
     alpha3_code: edit.alpha3Code,
     numeric_code: edit.numericCode,
     name: edit.name,

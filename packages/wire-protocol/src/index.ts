@@ -126,13 +126,16 @@ export type { Country, CountryEdit, WireCountry, WireCountryPage } from './entit
 export { applyEdit, mapCountry, newCountry } from './entities/country.js';
 
 export {
+  imageInfoSchema,
+  listImagesRequestSchema,
+  listImagesResponseSchema,
   getImagesRequestSchema,
   getImagesResponseSchema,
   imageBytesToBuffer,
   imageBytesToText,
   imageSchema,
 } from './entities/image.js';
-export type { WireImage } from './entities/image.js';
+export type { WireImage, WireImageInfo } from './entities/image.js';
 
 export {
   ACCOUNT_SUBJECTS,

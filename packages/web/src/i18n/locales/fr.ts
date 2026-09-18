@@ -309,6 +309,16 @@ const fr: SourceCatalogue = {
     required: 'Ce champ est obligatoire.',
   },
 
+  image: {
+    choose: 'Choisir une image',
+    change: "Changer d'image",
+    remove: 'Retirer',
+    pick: 'Choisir une image',
+    search: 'Rechercher des images',
+    none: 'Aucune image',
+    noneAvailable: 'Aucune image n’est disponible dans ce locataire.',
+  },
+
   common: {
     loading: 'Chargement...',
     all: 'Tous',

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FieldControl } from './FieldControl.js';
+import { FlagEditor } from './FlagEditor.js';
 import { useTranslation } from '../i18n/Provider.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
@@ -27,6 +28,17 @@ export interface EntityDetailPageProps {
   readonly title: string;
   /** The record's own idea of its name, shown while editing. */
   readonly subtitle?: string;
+  /**
+   * The image this entity carries, when it carries one.
+   *
+   * Some entities have a picture rather than a field for one, and it is a shared
+   * concern: the same editor serves a country's flag and a party's logo. Absent
+   * means the entity has no image, and nothing is rendered.
+   */
+  readonly image?: {
+    readonly imageId: string | undefined;
+    readonly onPick: (imageId: string | null) => void;
+  };
   readonly validationErrors?: Readonly<Record<string, string>>;
   readonly failureMessage?: string;
   readonly pending?: boolean;
@@ -45,6 +57,7 @@ export function EntityDetailPage({
   mode,
   title,
   subtitle,
+  image,
   validationErrors,
   failureMessage,
   pending = false,
@@ -137,6 +150,10 @@ export function EntityDetailPage({
         <div className="mb-4">
           <Notice tone="error">{failureMessage}</Notice>
         </div>
+      )}
+
+      {image !== undefined && (
+        <FlagEditor imageId={image.imageId} editable={editable} onPick={image.onPick} />
       )}
 
       <div className="mb-5 flex flex-wrap gap-1 border-b border-line" role="tablist">

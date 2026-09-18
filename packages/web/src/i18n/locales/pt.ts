@@ -314,6 +314,16 @@ const pt: SourceCatalogue = {
     required: 'Este campo é obrigatório.',
   },
 
+  image: {
+    choose: 'Escolher imagem',
+    change: 'Alterar imagem',
+    remove: 'Remover',
+    pick: 'Escolher uma imagem',
+    search: 'Pesquisar imagens',
+    none: 'Sem imagem',
+    noneAvailable: 'Não existem imagens disponíveis neste inquilino.',
+  },
+
   common: {
     loading: 'A carregar...',
     all: 'Todos',

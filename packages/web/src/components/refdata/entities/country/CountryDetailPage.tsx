@@ -150,6 +150,7 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
             version: wire.version,
             changeReasonCode: result.reasonCode,
             changeCommentary: result.commentary,
+            imageId: String(values['image_id'] ?? '') || null,
           });
 
     save.mutate(
@@ -221,6 +222,10 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
           setTouched(false);
           navigate(`/refdata/country/${String(id ?? '')}`);
         }}
+        image={{
+          imageId: String(values['image_id'] ?? ''),
+          onPick: (chosen) => change('image_id', chosen ?? ''),
+        }}
         onDelete={() => setStage('delete')}
         onHistory={() => navigate(`/refdata/country/${String(id ?? '')}/history`)}
       />
@@ -277,6 +282,7 @@ function recordFrom(wire: WireCountry | undefined): Record<string, unknown> {
     modified_by: wire.modified_by,
     performed_by: wire.performed_by,
     recorded_at: wire.recorded_at,
+    image_id: wire.image_id ?? '',
     change_reason_code: wire.change_reason_code,
     change_commentary: wire.change_commentary,
   };

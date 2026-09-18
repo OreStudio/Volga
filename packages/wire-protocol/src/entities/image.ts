@@ -69,3 +69,36 @@ export function imageBytesToText(data: WireImage['data']): string {
   if (typeof data === 'string') return data;
   return Buffer.from(data instanceof Uint8Array ? data : Uint8Array.from(data)).toString('utf8');
 }
+
+/**
+ * An image's metadata, without its bytes.
+ *
+ * What a picker needs: enough to show a grid of things to choose from, and not
+ * the contents of every one of them. The bytes are fetched only for the chosen
+ * image, which is what keeps a picker over six hundred flags from being six
+ * hundred downloads.
+ */
+export const imageInfoSchema = z.object({
+  image_id: z.string(),
+  key: z.string().default(''),
+  description: z.string().default(''),
+  size_bytes: z.int().nonnegative().default(0),
+});
+
+export type WireImageInfo = z.infer<typeof imageInfoSchema>;
+
+/**
+ * The list call.
+ *
+ * `modified_since` has no default because the C++ struct has none and the
+ * decoder requires every member; null means everything.
+ */
+export const listImagesRequestSchema = z.object({
+  modified_since: z.string().nullable(),
+});
+
+export const listImagesResponseSchema = z.object({
+  success: z.boolean().default(true),
+  message: z.string().default(''),
+  images: z.array(imageInfoSchema).default([]),
+});

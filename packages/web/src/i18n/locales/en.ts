@@ -318,6 +318,16 @@ export const en: SourceCatalogue = {
     required: 'This field is required.',
   },
 
+  image: {
+    choose: 'Choose image',
+    change: 'Change image',
+    remove: 'Remove',
+    pick: 'Choose an image',
+    search: 'Search images',
+    none: 'No image',
+    noneAvailable: 'No images are available in this tenant.',
+  },
+
   common: {
     loading: 'Loading...',
     all: 'All',
