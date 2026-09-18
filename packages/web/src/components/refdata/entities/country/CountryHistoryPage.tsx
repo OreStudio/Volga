@@ -4,6 +4,7 @@ import { EntityHistoryPage, type HistoryVersion } from '../../../../entity/Entit
 import { countryMeta } from '../../../../generated/refdata/ui/country_ui.js';
 import { useCountryHistory } from '../../../../api/countries.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
+import { usePageCrumbLabel } from '../../../PageCrumb.js';
 
 /**
  * The history of one country.
@@ -17,6 +18,11 @@ export function CountryHistoryPage(): ReactNode {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const query = useCountryHistory(id);
+
+  // The name the record goes by, taken from its most recent version, so the
+  // breadcrumb says Argentina rather than AR.
+  const newest = query.data?.versions[0];
+  usePageCrumbLabel(newest?.name);
 
   const versions: readonly HistoryVersion[] = (query.data?.versions ?? []).map((version) => ({
     version: version.version,

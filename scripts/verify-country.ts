@@ -183,8 +183,11 @@ try {
   check('it names the record', history.includes('AR') || history.includes('country'));
   await shot(page, '73-country-history');
 
-  // And from the history, back to the record, and on to the list.
-  await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /^AR$/ }).first().click();
+  // And from the history, back to the record, and on to the list. The record is
+  // named rather than identified, so the link reads Argentina and not AR.
+  const trail = await page.locator('nav[aria-label="Breadcrumb"]').textContent();
+  check('the breadcrumb names the record', /Argentina/.test(trail ?? ''), (trail ?? '').trim());
+  await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Argentina/ }).first().click();
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(500);
   check('the history leads back to the record', page.url().endsWith('/refdata/country/AR'), page.url());

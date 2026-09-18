@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
+import { PageCrumbProvider } from './PageCrumb.js';
 import { cx } from '../ui/Primitives.js';
 
 /**
@@ -20,7 +21,10 @@ export function AppShell(): ReactNode {
 
   return (
     <div className="flex h-full flex-col bg-bg-primary">
-      <TopBar onOpenMenu={() => setMenuOpen((open) => !open)} />
+      {/* The bar and the screen share the screen's name, so the bar can say what
+          the route only knows the identifier of. */}
+      <PageCrumbProvider>
+        <TopBar onOpenMenu={() => setMenuOpen((open) => !open)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Permanent from lg up, a drawer below it. */}
@@ -60,7 +64,8 @@ export function AppShell(): ReactNode {
         <main key={pathname} className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
-      </div>
+        </div>
+      </PageCrumbProvider>
     </div>
   );
 }

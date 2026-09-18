@@ -5,6 +5,7 @@ import { useSiteState } from '../api/site.js';
 import { useTranslation } from '../i18n/Provider.js';
 import { LANGUAGE_INFO } from '../i18n/languages.js';
 import { findComponent } from './registry.js';
+import { usePageCrumb } from './PageCrumb.js';
 import { humanise, translatedOrHumanised } from './labels.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Button, Tag, cx } from '../ui/Primitives.js';
@@ -31,7 +32,9 @@ export function TopBar({ onOpenMenu }: { readonly onOpenMenu: () => void }): Rea
   const [languageOpen, setLanguageOpen] = useState(false);
 
   const authenticated = state.status === 'authenticated';
-  const crumbs = breadcrumbs(pathname, t);
+  // The screen's own name for the record it is showing, when it has one.
+  const recordName = usePageCrumb();
+  const crumbs = breadcrumbs(pathname, t, recordName);
 
   return (
     <header className="flex h-13 shrink-0 items-center gap-3 border-b border-line px-3">
@@ -206,7 +209,11 @@ interface Crumb {
 }
 
 /** Where you are, from the route rather than from state. */
-function breadcrumbs(pathname: string, t: (key: string) => string): readonly Crumb[] {
+function breadcrumbs(
+  pathname: string,
+  t: (key: string) => string,
+  recordName: string | undefined,
+): readonly Crumb[] {
   /*
    * The crumbs follow the whole path, and everything but the last one is a link.
    *
@@ -247,9 +254,16 @@ function breadcrumbs(pathname: string, t: (key: string) => string): readonly Cru
     return crumbs;
   }
 
-  // The record is a page of its own, so it is reachable from its own history and
-  // from its edit form.
-  crumbs.push({ label: recordId, to: `/${component.path}/${entityPath}/${recordId}` });
+  /*
+   * The record is a page of its own, so it is reachable from its own history and
+   * from its edit form. It is named by what the screen says it is called rather
+   * than by the identifier in the URL, falling back to the identifier when the
+   * screen has not loaded the record yet.
+   */
+  crumbs.push({
+    label: recordName !== undefined && recordName.length > 0 ? recordName : recordId,
+    to: `/${component.path}/${entityPath}/${recordId}`,
+  });
 
   if (action === 'edit') {
     crumbs.push({ label: t('entity.edit') });

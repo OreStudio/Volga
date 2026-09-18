@@ -11,6 +11,7 @@ import { countryFieldGroups } from './country_field_groups.js';
 import { useCountries, useDeleteCountry, useSaveCountry } from '../../../../api/countries.js';
 import { useChangeReasons } from '../../../../api/changeReasons.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
+import { usePageCrumbLabel } from '../../../PageCrumb.js';
 import { applyEdit, newCountry, type WireCountry } from '@volga/protocol/browser';
 
 /**
@@ -194,6 +195,10 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
     mode === 'create'
       ? t('country.newTitle')
       : String(values['name'] ?? '') || t('country.singular');
+
+  // What the breadcrumb calls this page. The name is what a person recognises,
+  // and only this screen has loaded it.
+  usePageCrumbLabel(mode === 'create' ? undefined : String(values['name'] ?? ''));
 
   return (
     <>
