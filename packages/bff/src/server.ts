@@ -25,6 +25,7 @@ import {
   mapCountry,
   wireCountrySchema,
   applyEdit,
+  toWireTimestamp,
   loginResultSchema,
   selectPartyRequestSchema,
   sessionViewSchema,
@@ -423,15 +424,32 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       })
       .parse(request.body);
 
-    const saved = applyEdit(body.data, {
-      alpha3Code: body.data.alpha3_code,
-      numericCode: body.data.numeric_code,
-      name: body.data.name,
-      officialName: body.data.official_name,
-      version: body.data.version,
-      changeReasonCode: body.reason,
-      changeCommentary: body.commentary,
-    });
+    /*
+     * The tenant is the session's, not the client's.
+     *
+     * The service overwrites it from the request context and never trusts the
+     * client, so this is not what enforces the boundary. It matters anyway,
+     * because the field has to *decode*: an empty string is not a UUID, and a
+     * request that cannot be decoded is refused before any of the service's
+     * checks run. A create arrives with no tenant, and would fail as an
+     * unexplained refusal rather than as a validation error.
+     */
+    const saved = {
+      ...applyEdit(body.data, {
+        alpha3Code: body.data.alpha3_code,
+        numericCode: body.data.numeric_code,
+        name: body.data.name,
+        officialName: body.data.official_name,
+        version: body.data.version,
+        changeReasonCode: body.reason,
+        changeCommentary: body.commentary,
+      }),
+      tenant_id: body.data.tenant_id.length > 0 ? body.data.tenant_id : session.tenantId,
+      // Same reasoning as the tenant: the service stamps the real time, so this
+      // only has to be a timestamp the decoder accepts, and an empty string is
+      // not one.
+      recorded_at: body.data.recorded_at.length > 0 ? body.data.recorded_at : toWireTimestamp(new Date()),
+    };
 
     const response = await session.client.callAuthenticated(
       SUBJECTS.saveCountry,

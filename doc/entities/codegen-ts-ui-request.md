@@ -690,6 +690,23 @@ the next person does not have to infer it.
 
 ---
 
+## 4b. Fields the server owns
+
+Every entity carries fields the service overwrites on write: the tenant, the
+actors, the timestamp. The generated declaration must not present them as
+editable, and the generated write path must not send them empty.
+
+The second half is the trap. The request is decoded before the service's
+authorisation runs, so a field that does not parse fails the whole request, and a
+create has no tenant and no timestamp to send. The service rejects it as an
+unexplained refusal, which from the client is indistinguishable from a missing
+permission.
+
+So the generated write path needs a well-formed placeholder for each server-owned
+field, or the BFF needs to supply one from the session. Either is fine; silence is
+not, and this is the kind of thing that costs a day per entity if it is discovered
+per entity.
+
 ## 5. What must not be generated
 
 Stated explicitly, because a generator that overreaches is harder to work with

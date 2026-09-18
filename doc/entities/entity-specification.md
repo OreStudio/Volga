@@ -388,6 +388,22 @@ being explicit about.
 So a person can change whose email an account uses, and the record will not say
 why. That is a defect, not a convention.
 
+### Server-owned fields must still be well formed
+
+The service overwrites what it owns: the tenant, the actor, the timestamp, and
+the version. That is a security boundary and it means a client cannot forge them.
+
+It does **not** mean a client may omit them or send an empty string. The request
+is decoded before any of the service's checks run, so a field that does not parse
+fails the whole request, and it fails as an unexplained refusal rather than as a
+validation error. A create, which has no tenant and no timestamp, must therefore
+send a tenant and a timestamp anyway — placeholders that parse, which the service
+then replaces.
+
+This is worth stating because the failure mode is expensive: a missing field and a
+refused permission look identical from the client, and the difference is days of
+work.
+
 ### The rule
 
 Every create, amend and delete prompts for a reason, and the reason is stored.
