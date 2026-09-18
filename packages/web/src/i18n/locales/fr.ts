@@ -147,6 +147,8 @@ const fr: SourceCatalogue = {
     commentaryPlaceholder: 'Saisissez une explication pour ce changement...',
     commentaryRequired: 'Le commentaire est obligatoire pour ce motif.',
     commentaryOptional: 'Le commentaire est facultatif pour ce motif.',
+    noReasons: "Aucun motif n'est disponible pour cette opération. Un administrateur doit en ajouter un.",
+    nonMaterial: 'sans changement',
     required: 'Obligatoire',
     create: 'Créer',
     confirmDelete: 'Confirmer la suppression',
@@ -254,6 +256,11 @@ const fr: SourceCatalogue = {
 
   country: {
     title: 'Pays',
+    singular: 'pays',
+    newTitle: 'Nouveau pays',
+    invalidAlpha2: 'Un code alpha-2 comporte deux lettres.',
+    invalidAlpha3: 'Un code alpha-3 comporte trois lettres.',
+    invalidNumeric: 'Un code numérique ISO comporte trois chiffres.',
     description: 'Pays, leurs codes ISO et leurs noms officiels.',
     colAlpha2Code: 'Code alpha-2',
     colAlpha3Code: 'Code alpha-3',
@@ -274,6 +281,30 @@ const fr: SourceCatalogue = {
     numericCodePh: 'Saisissez le code numérique ISO',
     namePh: 'Saisissez le nom affiché',
     officialNamePh: 'Saisissez le nom officiel du pays',
+  },
+
+  table: {
+    chooseColumns: 'Choisir les colonnes',
+    rowActions: 'Actions',
+  },
+  history: {
+    description: 'Toutes les versions de cet enregistrement, la plus récente en premier.',
+    timeline: 'Chronologie',
+    current: 'actuelle',
+    empty: "Cet enregistrement n'a pas d'historique.",
+    initial: 'Version initiale',
+    comparing: 'Comparaison de v{from} avec v{to}',
+    allFields: 'Tous les champs',
+    onlyChanges: 'Changements seulement',
+    field: 'Champ',
+    before: 'Avant',
+    after: 'Après',
+    noChanges: 'Aucun changement de champ entre ces versions.',
+    openVersion: 'Ouvrir cette version',
+  },
+
+  validation: {
+    required: 'Ce champ est obligatoire.',
   },
 
   common: {

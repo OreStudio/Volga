@@ -63,6 +63,51 @@ export const listCountriesRequestSchema = z.object({
 });
 
 /**
+ * A save.
+ *
+ * The whole domain object, because the service replaces the record rather than
+ * patching it. `version` is the optimistic lock: sending a stale one is refused,
+ * so two people editing the same record is caught rather than one silently
+ * overwriting the other.
+ *
+ * The audit metadata is stamped server-side, so the reason and the commentary
+ * are the only audit fields the client supplies.
+ */
+export const saveCountryRequestSchema = z.object({
+  data: wireCountrySchema,
+});
+
+export const saveCountryResponseSchema = z.object({
+  success: z.boolean().default(false),
+  message: text,
+});
+
+/**
+ * A delete.
+ *
+ * By natural key, and plural, because the service deletes a set.
+ */
+export const deleteCountriesRequestSchema = z.object({
+  alpha2_codes: z.array(z.string()),
+});
+
+export const deleteCountryResponseSchema = z.object({
+  success: z.boolean().default(false),
+  message: text,
+});
+
+/** The history of one record, newest version first as the service returns it. */
+export const countryHistoryRequestSchema = z.object({
+  alpha2_code: z.string(),
+});
+
+export const countryHistoryResponseSchema = z.object({
+  history: z.array(wireCountrySchema).default([]),
+  success: z.boolean().default(false),
+  message: text,
+});
+
+/**
  * A country, as the interface works with it.
  *
  * camelCase, because this is no longer the wire. The mapping happens once, here,
@@ -82,6 +127,16 @@ export interface Country {
   readonly changeReasonCode: string;
   readonly changeCommentary: string;
   readonly performedBy: string;
+  /** The flag image, when the record carries one. */
+  readonly imageId: string | null;
+  /**
+   * The record as the service sent it.
+   *
+   * Kept for the write path, because a save replaces the whole record and there
+   * are fields the interface neither shows nor understands. Round-tripping them
+   * untouched is the only way an amend cannot quietly drop one.
+   */
+  readonly wire: WireCountry;
 }
 
 export function mapCountry(row: WireCountry): Country {
@@ -98,5 +153,71 @@ export function mapCountry(row: WireCountry): Country {
     changeReasonCode: row.change_reason_code,
     changeCommentary: row.change_commentary,
     performedBy: row.performed_by,
+    imageId: row.image_id,
+    wire: row,
+  };
+}
+
+/**
+ * What a person can change, plus why.
+ *
+ * Deliberately not the whole record: the fields below are the editable ones, and
+ * everything else is taken from the record being replaced.
+ */
+export interface CountryEdit {
+  readonly alpha3Code: string;
+  readonly numericCode: string;
+  readonly name: string;
+  readonly officialName: string;
+  /** The version the person was looking at, for the optimistic lock. */
+  readonly version: number;
+  readonly changeReasonCode: string;
+  readonly changeCommentary: string;
+}
+
+/**
+ * Merges an edit onto the record it came from.
+ *
+ * The identity is not editable, so it is carried through rather than accepted
+ * from the form, and the audit actors and timestamp are the server's to stamp.
+ */
+export function applyEdit(current: WireCountry, edit: CountryEdit): WireCountry {
+  return {
+    ...current,
+    alpha3_code: edit.alpha3Code,
+    numeric_code: edit.numericCode,
+    name: edit.name,
+    official_name: edit.officialName,
+    version: edit.version,
+    change_reason_code: edit.changeReasonCode,
+    change_commentary: edit.changeCommentary,
+  };
+}
+
+/** A new record. The identity is the one field a person chooses. */
+export function newCountry(input: {
+  readonly alpha2Code: string;
+  readonly alpha3Code: string;
+  readonly numericCode: string;
+  readonly name: string;
+  readonly officialName: string;
+  readonly changeReasonCode: string;
+  readonly changeCommentary: string;
+}): WireCountry {
+  return {
+    version: 0,
+    tenant_id: '',
+    image_id: null,
+    coding_scheme_code: null,
+    alpha2_code: input.alpha2Code,
+    alpha3_code: input.alpha3Code,
+    numeric_code: input.numericCode,
+    name: input.name,
+    official_name: input.officialName,
+    modified_by: '',
+    change_reason_code: input.changeReasonCode,
+    change_commentary: input.changeCommentary,
+    performed_by: '',
+    recorded_at: '',
   };
 }

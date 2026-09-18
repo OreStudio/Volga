@@ -16,6 +16,7 @@ import { SignInPage } from './pages/SignInPage.js';
 import { AccountsPage } from './pages/AccountsPage.js';
 import { CountryListPage } from './components/refdata/entities/country/CountryListPage.js';
 import { CountryDetailPage } from './components/refdata/entities/country/CountryDetailPage.js';
+import { CountryHistoryPage } from './components/refdata/entities/country/CountryHistoryPage.js';
 import './styles.css';
 
 /**
@@ -117,7 +118,10 @@ function App(): ReactNode {
             rather than excluded by the route: a record that is not found says so,
             which is better than a route that matches nothing and shows nothing.
           */}
-          <Route path="/refdata/country/:id" element={<CountryDetailPage />} />
+          <Route path="/refdata/country/new" element={<CountryDetailPage mode="create" />} />
+          <Route path="/refdata/country/:id" element={<CountryDetailPage mode="read" />} />
+          <Route path="/refdata/country/:id/edit" element={<CountryDetailPage mode="edit" />} />
+          <Route path="/refdata/country/:id/history" element={<CountryHistoryPage />} />
         </Route>
       ) : (
         <>

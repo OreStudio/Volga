@@ -19,6 +19,10 @@ export const SUBJECTS = {
   switchParty: 'iam.v1.accounts.switch-party',
   listAccounts: 'iam.v1.accounts.list',
   listCountries: 'refdata.v1.countries.list',
+  saveCountry: 'refdata.v1.countries.save',
+  deleteCountries: 'refdata.v1.countries.delete',
+  countryHistory: 'refdata.v1.countries.history',
+  listChangeReasons: 'dq.v1.change_reasons.list',
   httpInfo: 'http-server.v1.info.get',
 } as const;
 
@@ -301,3 +305,35 @@ export const partyIdSchema = z.string().regex(/^[0-9a-f-]{36}$/);
 
 /** Re-exported so callers can validate a party in isolation. */
 export { partySummarySchema };
+
+
+/**
+ * The change reasons a write may carry.
+ *
+ * Read from the DQ service rather than declared here as a list, because the set
+ * is data that differs per deployment. The three `applies_to_*` flags are what
+ * decide which reasons are offered for which operation, and
+ * `requires_commentary` decides whether an explanation is mandatory.
+ *
+ * `applies_to_new` is the wire name; the model calls the same idea create.
+ */
+export const changeReasonSchema = z.object({
+  version: z.int().nonnegative().default(0),
+  code: z.string(),
+  description: z.string().default(''),
+  category_code: z.string().default(''),
+  applies_to_new: z.boolean().default(false),
+  applies_to_amend: z.boolean().default(false),
+  applies_to_delete: z.boolean().default(false),
+  requires_commentary: z.boolean().default(false),
+  display_order: z.int().default(0),
+});
+
+export type ChangeReason = z.infer<typeof changeReasonSchema>;
+
+export const changeReasonPageSchema = z.object({
+  reasons: z.array(changeReasonSchema).default([]),
+  total_available_count: z.int().nonnegative().default(0),
+  success: z.boolean().default(false),
+  message: z.string().default(''),
+});

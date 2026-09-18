@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { DataTable } from './DataTable.js';
+import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { useTranslation } from '../i18n/Provider.js';
@@ -27,6 +27,12 @@ export interface EntityListPageProps<Row> {
   readonly onPageSizeChange: (size: number) => void;
   readonly onReload: () => void;
   readonly onOpen?: (row: Row) => void;
+  /** Creating a new record. Omitted where the entity has none. */
+  readonly onCreate?: () => void;
+  /** Reached from the row menu. Empty when the entity offers none. */
+  readonly onEdit?: (row: Row) => void;
+  readonly onHistory?: (row: Row) => void;
+  readonly onDelete?: (row: Row) => void;
   /** Fields the search box matches. */
   readonly searchFields?: readonly string[];
   /**
@@ -34,6 +40,14 @@ export interface EntityListPageProps<Row> {
    * own fields rather than saying "Search" and leaving nobody to guess.
    */
   readonly searchPlaceholderKey?: string;
+  /**
+   * A message from a failed action, shown above the table.
+   *
+   * Actions are wired by the entity, so an entity that deletes needs somewhere
+   * to report a refusal. The screen owns the reporting because it owns the
+   * layout, and a modal for a refused delete is heavier than the news deserves.
+   */
+  readonly failureMessage?: string;
   /** The field the type filter groups on, and the values present. */
   readonly filterField?: string;
 }
@@ -54,8 +68,13 @@ export function EntityListPage<Row extends Record<string, unknown>>({
   onPageSizeChange,
   onReload,
   onOpen,
+  onCreate,
+  onEdit,
+  onHistory,
+  onDelete,
   searchFields = [],
   searchPlaceholderKey = 'entity.search',
+  failureMessage,
   filterField,
 }: EntityListPageProps<Row>): ReactNode {
   const { t, plural } = useTranslation();
@@ -78,6 +97,29 @@ export function EntityListPage<Row extends Record<string, unknown>>({
     if (filterField === undefined) return [];
     return [...new Set(rows.map((row) => String(row[filterField] ?? '')))].filter((v) => v.length > 0).sort();
   }, [rows, filterField]);
+
+  // The actions a row offers, in the order a person looks for them. History
+  // before Delete, because the destructive one should not be the first thing
+  // under the cursor.
+  const rowActions: readonly RowAction<Row>[] = [
+    ...(onEdit === undefined
+      ? []
+      : [{ id: 'edit', label: t('entity.edit'), icon: 'edit' as const, onSelect: onEdit }]),
+    ...(onHistory === undefined
+      ? []
+      : [{ id: 'history', label: t('entity.history'), icon: 'history' as const, onSelect: onHistory }]),
+    ...(onDelete === undefined
+      ? []
+      : [
+          {
+            id: 'delete',
+            label: t('entity.delete'),
+            icon: 'delete' as const,
+            danger: true,
+            onSelect: onDelete,
+          },
+        ]),
+  ];
 
   const pages = Math.max(1, Math.ceil(totalCount / pageSize));
   const loading = query.isPending;
@@ -109,6 +151,12 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           </Button>
         </div>
       </header>
+
+      {failureMessage !== undefined && (
+        <div className="mb-4">
+          <Notice tone="error">{failureMessage}</Notice>
+        </div>
+      )}
 
       {query.isError && (
         <div className="mb-4">
@@ -167,6 +215,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           rows={visible}
           rowKey={(row) => String(row[meta.keyField] ?? '')}
           {...(onOpen === undefined ? {} : { onOpen })}
+          {...(rowActions.length === 0 ? {} : { rowActions })}
           loading={loading}
           emptyMessage={isFiltered ? t('accounts.empty') : t('entity.noRecords')}
         />

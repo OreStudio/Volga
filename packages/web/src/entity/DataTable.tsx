@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
+import type { IconName } from '../ui/icons/index.js';
 import { useTranslation } from '../i18n/Provider.js';
 import { cx } from '../ui/Primitives.js';
 import type { ColumnMeta, ColumnStyle } from './contract.js';
@@ -15,11 +16,30 @@ import type { ColumnMeta, ColumnStyle } from './contract.js';
  * Cells are rendered by style rather than by a per-entity component, so a new
  * entity adds no rendering code.
  */
+/** One entry in a row's action menu. */
+export interface RowAction<Row> {
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: IconName;
+  /** Rendered in the danger colour, for anything destructive. */
+  readonly danger?: boolean;
+  readonly onSelect: (row: Row) => void;
+}
+
 export interface DataTableProps<Row> {
   readonly columns: readonly ColumnMeta[];
   readonly rows: readonly Row[];
   readonly rowKey: (row: Row) => string;
   readonly onOpen?: (row: Row) => void;
+  /**
+   * Actions offered per row, in a menu at the end of the row.
+   *
+   * A menu rather than a toolbar of icons, which is what the web does and what a
+   * person expects: the actions belong to the row they act on, they do not need
+   * to be on screen when nothing is selected, and a menu can be labelled in
+   * words where a toolbar had room only for a glyph.
+   */
+  readonly rowActions?: readonly RowAction<Row>[];
   readonly loading?: boolean;
   readonly emptyMessage: string;
 }
@@ -29,6 +49,7 @@ export function DataTable<Row extends Record<string, unknown>>({
   rows,
   rowKey,
   onOpen,
+  rowActions,
   loading = false,
   emptyMessage,
 }: DataTableProps<Row>): ReactNode {
@@ -38,6 +59,9 @@ export function DataTable<Row extends Record<string, unknown>>({
     () => new Set(columns.filter((c) => !c.hidden || c.name === columns[0]?.name).map((c) => c.name)),
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  // Which row's action menu is open, if any. One at a time, so two menus cannot
+  // be open at once and clicking elsewhere closes whichever is.
+  const [openRow, setOpenRow] = useState<string | undefined>(undefined);
 
   const visible = columns.filter((column) => shown.has(column.name));
 
@@ -81,7 +105,7 @@ export function DataTable<Row extends Record<string, unknown>>({
                 <button
                   type="button"
                   onClick={() => setMenuOpen((open) => !open)}
-                  aria-label={t('entity.filter')}
+                  aria-label={t('table.chooseColumns')}
                   aria-expanded={menuOpen}
                   className="rounded p-0.5 text-ink-faint hover:text-ink"
                 >
@@ -90,6 +114,7 @@ export function DataTable<Row extends Record<string, unknown>>({
                   </svg>
                 </button>
               </th>
+              {rowActions !== undefined && rowActions.length > 0 && <th scope="col" className="w-8 px-1 py-2" />}
             </tr>
           </thead>
           <tbody>
@@ -108,6 +133,20 @@ export function DataTable<Row extends Record<string, unknown>>({
                   </td>
                 ))}
                 <td />
+                {rowActions !== undefined && rowActions.length > 0 && (
+                  <td className="px-1 py-1">
+                    <RowMenu
+                      open={openRow === rowKey(row)}
+                      onToggle={() =>
+                        setOpenRow(openRow === rowKey(row) ? undefined : rowKey(row))
+                      }
+                      onClose={() => setOpenRow(undefined)}
+                      actions={rowActions}
+                      row={row}
+                      label={t('table.rowActions')}
+                    />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -133,6 +172,94 @@ export function DataTable<Row extends Record<string, unknown>>({
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A row's actions, behind one button.
+ *
+ * Opened by clicking the button, closed by choosing something, by clicking
+ * anywhere else, or by pressing Escape, which is what a menu has to do to feel
+ * like one.
+ */
+function RowMenu<Row>({
+  open,
+  onToggle,
+  onClose,
+  actions,
+  row,
+  label,
+}: {
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly onClose: () => void;
+  readonly actions: readonly RowAction<Row>[];
+  readonly row: Row;
+  readonly label: string;
+}): ReactNode {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(event) => {
+          // The row itself opens the record, and the menu must not do that too.
+          event.stopPropagation();
+          onToggle();
+        }}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="rounded p-1 text-ink-faint hover:bg-surface-hover hover:text-ink"
+      >
+        <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
+          <circle cx="8" cy="3.5" r="1.2" fill="currentColor" />
+          <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+          <circle cx="8" cy="12.5" r="1.2" fill="currentColor" />
+        </svg>
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
+            }}
+          />
+          <ul
+            role="menu"
+            className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-line bg-surface-overlay py-1 shadow-lg"
+          >
+            {actions.map((action) => (
+              <li key={action.id} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onClose();
+                    action.onSelect(row);
+                  }}
+                  className={cx(
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm',
+                    action.danger
+                      ? 'text-red-400 hover:bg-surface-hover'
+                      : 'text-ink-muted hover:bg-surface-hover hover:text-ink',
+                  )}
+                >
+                  {action.icon !== undefined && <MaskIcon name={action.icon} className="size-3.5" />}
+                  {action.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

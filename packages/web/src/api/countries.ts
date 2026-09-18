@@ -1,5 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { request } from './transport.js';
+import type { WireCountry } from '@volga/protocol';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 /**
@@ -22,6 +24,8 @@ const countrySchema = z.object({
   changeReasonCode: z.string(),
   changeCommentary: z.string(),
   performedBy: z.string(),
+  /** The flag image, when the record carries one. */
+  imageId: z.string().nullable(),
 });
 
 export type Country = z.infer<typeof countrySchema>;
@@ -50,6 +54,7 @@ export function toRow(country: Country): CountryRow {
     performed_by: country.performedBy,
     // The record's identity, which for this entity is its natural key.
     id: country.alpha2Code,
+    image_id: country.imageId,
   };
 }
 
@@ -86,5 +91,79 @@ export function useCountries(query: CountryQuery): UseQueryResult<{
       return { rows: page.countries.map(toRow), totalCount: page.totalCount };
     },
     placeholderData: (previous) => previous,
+  });
+}
+
+
+/**
+ * Creates or amends one country.
+ *
+ * The record being replaced is sent whole, with the edits applied, because the
+ * service replaces rather than patches and there are fields the interface
+ * neither shows nor understands. The version carried in it is the optimistic
+ * lock.
+ */
+export function useSaveCountry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      readonly data: WireCountry;
+      readonly reasonCode: string;
+      readonly commentary: string;
+    }) => {
+      await request('/api/countries', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          data: input.data,
+          reason: input.reasonCode,
+          commentary: input.commentary,
+        }),
+      });
+    },
+    // Every page and the history may now be wrong, so both are invalidated
+    // rather than patched. A list is cheap to refetch and a stale one is worse.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['countries'] });
+      void queryClient.invalidateQueries({ queryKey: ['country-history'] });
+    },
+  });
+}
+
+export function useDeleteCountry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (alpha2Code: string) => {
+      await request(`/api/countries/${encodeURIComponent(alpha2Code)}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['countries'] });
+    },
+  });
+}
+
+/**
+ * Every version of one country.
+ *
+ * Fetched on demand rather than with the record, because most visits to a record
+ * are not visits to its history.
+ */
+const historySchema = z.object({
+  versions: z.array(countrySchema),
+  message: z.string(),
+});
+
+export function useCountryHistory(alpha2Code: string | undefined): UseQueryResult<{
+  versions: readonly Country[];
+}> {
+  return useQuery({
+    queryKey: ['country-history', alpha2Code],
+    enabled: alpha2Code !== undefined && alpha2Code.length > 0,
+    queryFn: async () => {
+      const body = await request(`/api/countries/${encodeURIComponent(alpha2Code ?? '')}/history`, {
+        method: 'GET',
+      });
+      return historySchema.parse(body);
+    },
   });
 }

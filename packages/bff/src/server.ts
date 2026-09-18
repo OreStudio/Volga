@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
+import { z } from 'zod';
 import {
   NatsTransport,
   OresClient,
@@ -11,7 +12,16 @@ import {
   SUBJECTS,
   listCountriesRequestSchema,
   countryPageSchema,
+  changeReasonPageSchema,
+  countryHistoryRequestSchema,
+  countryHistoryResponseSchema,
+  saveCountryRequestSchema,
+  saveCountryResponseSchema,
+  deleteCountriesRequestSchema,
+  deleteCountryResponseSchema,
   mapCountry,
+  wireCountrySchema,
+  applyEdit,
   loginResultSchema,
   selectPartyRequestSchema,
   sessionViewSchema,
@@ -390,6 +400,116 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     const { id } = request.params as { id: string };
     await deleteAccount(session.client, id);
     return { ok: true };
+  });
+
+  /**
+   * Creates or amends one country.
+   *
+   * A save replaces the whole record, so the client sends the record it was
+   * looking at with the edits applied, and the audit reason alongside. The
+   * version it was looking at is the optimistic lock: a stale one is refused by
+   * the service rather than silently overwriting somebody else's change.
+   */
+  server.post('/api/countries', async (request, reply) => {
+    const session = requireSession(request);
+    const body = z
+      .object({
+        data: wireCountrySchema,
+        reason: z.string(),
+        commentary: z.string().default(''),
+      })
+      .parse(request.body);
+
+    const saved = applyEdit(body.data, {
+      alpha3Code: body.data.alpha3_code,
+      numericCode: body.data.numeric_code,
+      name: body.data.name,
+      officialName: body.data.official_name,
+      version: body.data.version,
+      changeReasonCode: body.reason,
+      changeCommentary: body.commentary,
+    });
+
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.saveCountry,
+      saveCountryRequestSchema.parse({ data: saved }),
+      saveCountryResponseSchema,
+    );
+    // A refusal is a refusal, not a failure: the person did nothing wrong, the
+    // service said no, and its words are better than ours.
+    if (!response.success) {
+      return reply.code(409).send({ message: response.message });
+    }
+    return { ok: true, message: response.message };
+  });
+
+  /**
+   * Deletes one country by its natural key.
+   */
+  server.delete('/api/countries/:code', async (request, reply) => {
+    const session = requireSession(request);
+    const { code } = request.params as { code: string };
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.deleteCountries,
+      deleteCountriesRequestSchema.parse({ alpha2_codes: [code] }),
+      deleteCountryResponseSchema,
+    );
+    if (!response.success) {
+      return reply.code(409).send({ message: response.message });
+    }
+    return { ok: true, message: response.message };
+  });
+
+  /**
+   * Every version of one country.
+   *
+   * Newest first, because that is how a person reads a history: what changed
+   * last is the question being asked.
+   */
+  server.get('/api/countries/:code/history', async (request) => {
+    const session = requireSession(request);
+    const { code } = request.params as { code: string };
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.countryHistory,
+      countryHistoryRequestSchema.parse({ alpha2_code: code }),
+      countryHistoryResponseSchema,
+    );
+    return {
+      versions: response.history.map(mapCountry).reverse(),
+      message: response.message,
+    };
+  });
+
+  /**
+   * The reasons a write may carry.
+   *
+   * Fetched from the server rather than declared in the interface, because the
+   * set is data: it differs per deployment, and one reason means "changed
+   * nothing material" while the rest mean the opposite.
+   */
+  server.get('/api/change-reasons', async (request) => {
+    const session = requireSession(request);
+    const query = request.query as Record<string, string | undefined>;
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.listChangeReasons,
+      {
+        offset: query['offset'] === undefined ? 0 : Number(query['offset']),
+        limit: query['limit'] === undefined ? 200 : Number(query['limit']),
+      },
+      changeReasonPageSchema,
+    );
+    return {
+      reasons: response.reasons.map((reason) => ({
+        code: reason.code,
+        description: reason.description,
+        categoryCode: reason.category_code,
+        appliesToNew: reason.applies_to_new,
+        appliesToAmend: reason.applies_to_amend,
+        appliesToDelete: reason.applies_to_delete,
+        requiresCommentary: reason.requires_commentary,
+        displayOrder: reason.display_order,
+      })),
+    };
   });
 
   server.addHook('onClose', async () => {

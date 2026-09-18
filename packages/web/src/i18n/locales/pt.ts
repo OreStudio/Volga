@@ -152,6 +152,8 @@ const pt: SourceCatalogue = {
     commentaryPlaceholder: 'Introduza uma explicação para esta alteração...',
     commentaryRequired: 'O comentário é obrigatório para este motivo.',
     commentaryOptional: 'O comentário é opcional para este motivo.',
+    noReasons: 'Não há motivos disponíveis para esta operação. Um administrador tem de adicionar um.',
+    nonMaterial: 'sem alteração',
     required: 'Obrigatório',
     create: 'Criar',
     confirmDelete: 'Confirmar eliminação',
@@ -259,6 +261,11 @@ const pt: SourceCatalogue = {
 
   country: {
     title: 'Países',
+    singular: 'país',
+    newTitle: 'Novo país',
+    invalidAlpha2: 'Um código alfa-2 tem duas letras.',
+    invalidAlpha3: 'Um código alfa-3 tem três letras.',
+    invalidNumeric: 'Um código numérico ISO tem três dígitos.',
     description: 'Países, os seus códigos ISO e os seus nomes oficiais.',
     colAlpha2Code: 'Código alfa-2',
     colAlpha3Code: 'Código alfa-3',
@@ -279,6 +286,30 @@ const pt: SourceCatalogue = {
     numericCodePh: 'Introduza o código numérico ISO',
     namePh: 'Introduza o nome a apresentar',
     officialNamePh: 'Introduza o nome oficial do país',
+  },
+
+  table: {
+    chooseColumns: 'Escolher colunas',
+    rowActions: 'Ações',
+  },
+  history: {
+    description: 'Todas as versões deste registo, da mais recente para a mais antiga.',
+    timeline: 'Cronologia',
+    current: 'atual',
+    empty: 'Este registo não tem histórico.',
+    initial: 'Versão inicial',
+    comparing: 'A comparar a v{from} com a v{to}',
+    allFields: 'Todos os campos',
+    onlyChanges: 'Apenas alterações',
+    field: 'Campo',
+    before: 'Antes',
+    after: 'Depois',
+    noChanges: 'Sem alterações de campos entre estas versões.',
+    openVersion: 'Abrir esta versão',
+  },
+
+  validation: {
+    required: 'Este campo é obrigatório.',
   },
 
   common: {

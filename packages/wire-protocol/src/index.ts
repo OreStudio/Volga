@@ -106,12 +106,24 @@ export type {
 } from './operations.js';
 
 export {
+  changeReasonPageSchema,
+  changeReasonSchema,
+} from './operations.js';
+export type { ChangeReason } from './operations.js';
+
+export {
   countryPageSchema,
+  countryHistoryRequestSchema,
+  countryHistoryResponseSchema,
+  deleteCountriesRequestSchema,
+  deleteCountryResponseSchema,
+  saveCountryRequestSchema,
+  saveCountryResponseSchema,
   listCountriesRequestSchema,
   wireCountrySchema,
 } from './entities/country.js';
-export type { Country, WireCountry, WireCountryPage } from './entities/country.js';
-export { mapCountry } from './entities/country.js';
+export type { Country, CountryEdit, WireCountry, WireCountryPage } from './entities/country.js';
+export { applyEdit, mapCountry, newCountry } from './entities/country.js';
 
 export {
   ACCOUNT_SUBJECTS,

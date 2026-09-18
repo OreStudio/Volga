@@ -157,6 +157,8 @@ export const en: SourceCatalogue = {
     commentaryPlaceholder: 'Enter explanation for this change...',
     commentaryRequired: 'Commentary is required for this reason.',
     commentaryOptional: 'Commentary is optional for this reason.',
+    noReasons: 'No reasons are available for this operation. An administrator has to add one.',
+    nonMaterial: 'no change',
     required: 'Required',
     create: 'Create',
     confirmDelete: 'Confirm Delete',
@@ -263,6 +265,11 @@ export const en: SourceCatalogue = {
 
   country: {
     title: 'Countries',
+    singular: 'country',
+    newTitle: 'New country',
+    invalidAlpha2: 'An alpha-2 code is two letters.',
+    invalidAlpha3: 'An alpha-3 code is three letters.',
+    invalidNumeric: 'An ISO numeric code is three digits.',
     description: 'Countries, their ISO codes and their official names.',
     colAlpha2Code: 'Alpha-2 code',
     colAlpha3Code: 'Alpha-3 code',
@@ -283,6 +290,30 @@ export const en: SourceCatalogue = {
     numericCodePh: 'Enter ISO numeric code',
     namePh: 'Enter display name',
     officialNamePh: 'Enter official country name',
+  },
+
+  table: {
+    chooseColumns: 'Choose columns',
+    rowActions: 'Actions',
+  },
+  history: {
+    description: 'Every version of this record, newest first.',
+    timeline: 'Timeline',
+    current: 'current',
+    empty: 'This record has no history.',
+    initial: 'Initial version',
+    comparing: 'Comparing v{from} with v{to}',
+    allFields: 'All fields',
+    onlyChanges: 'Only changes',
+    field: 'Field',
+    before: 'Before',
+    after: 'After',
+    noChanges: 'No field changes between these versions.',
+    openVersion: 'Open this version',
+  },
+
+  validation: {
+    required: 'This field is required.',
   },
 
   common: {

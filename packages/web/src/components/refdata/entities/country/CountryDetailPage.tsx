@@ -1,29 +1,178 @@
-import type { ReactNode } from 'react';
-import { useParams } from 'react-router';
-import { EntityDetailPage } from '../../../../entity/EntityDetailPage.js';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { EntityDetailPage, type DetailMode } from '../../../../entity/EntityDetailPage.js';
+import { ConfirmDialog } from '../../../../entity/ConfirmDialog.js';
+import {
+  ChangeReasonDialog,
+  type ChangeReasonResult,
+} from '../../../../entity/ChangeReasonDialog.js';
 import { countryMeta } from './country_ui.js';
 import { countryFieldGroups } from './country_field_groups.js';
-import { useCountries } from '../../../../api/countries.js';
+import { useCountries, useDeleteCountry, useSaveCountry } from '../../../../api/countries.js';
+import { useChangeReasons } from '../../../../api/changeReasons.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
-import type { CountryRow } from '../../../../api/countries.js';
+import { applyEdit, newCountry, type WireCountry } from '@volga/protocol';
 
 /**
- * Reading one country.
+ * One country: reading it, amending it, or creating it.
  *
- * The record comes from the list query's cache rather than a second request,
- * because the list has already fetched the page it came from. A record reached by
- * a deep link with no cache falls back to the first page, which finds it.
+ * The record comes from the list query's cache, because the list has already
+ * fetched the page it came from and a second request would be a second chance to
+ * disagree. A deep link finds the record on the first page, which is large enough
+ * for a reference-data set.
+ *
+ * The form is the shared one. What is here is the wiring: which fields are
+ * editable, what a valid record looks like, and what happens when Save or Delete
+ * is pressed.
  */
-export function CountryDetailPage(): ReactNode {
+export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): ReactNode {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  // The list is already fetched and cached, so the detail reads from it rather
-  // than issuing a second request. A deep link finds the record on the first
-  // page, which is large enough for a reference-data set.
-  const query = useCountries({ page: 1, pageSize: 500 });
-  const country = query.data?.rows.find((row) => row['id'] === id);
+  const navigate = useNavigate();
 
-  if (query.isSuccess && country === undefined) {
+  const query = useCountries({ page: 1, pageSize: 500 });
+  const reasons = useChangeReasons();
+  const save = useSaveCountry();
+  const remove = useDeleteCountry();
+
+  const current = query.data?.rows.find((row) => row['id'] === id);
+  const wire = current?.['wire'] as WireCountry | undefined;
+
+  // The blank record a create starts from. Its identity is the one field a
+  // person chooses, so it is empty until they do.
+  const empty = useMemo(
+    () => ({
+      alpha2_code: '',
+      alpha3_code: '',
+      numeric_code: '',
+      name: '',
+      official_name: '',
+      version: 0,
+      change_reason_code: '',
+      change_commentary: '',
+      modified_by: '',
+      performed_by: '',
+      recorded_at: '',
+    }),
+    [],
+  );
+
+  const [values, setValues] = useState<Record<string, unknown>>(() => ({ ...empty }));
+  const [touched, setTouched] = useState(false);
+  const [validation, setValidation] = useState<Record<string, string>>({});
+  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [stage, setStage] = useState<'reason' | 'delete' | 'delete-reason' | undefined>(undefined);
+
+  // Seed from the record once it arrives. Guarded by `touched` so a late fetch
+  // cannot overwrite what somebody has already typed.
+  const [seeded, setSeeded] = useState<string | undefined>(undefined);
+  if (!touched && current !== undefined && seeded !== id) {
+    setSeeded(id);
+    setValues(recordFrom(wire));
+  }
+
+  function change(name: string, value: unknown): void {
+    setTouched(true);
+    setValues((previous) => ({ ...previous, [name]: value }));
+    // A field being corrected should not keep showing its old complaint.
+    setValidation((previous) => {
+      if (previous[name] === undefined) return previous;
+      const next = { ...previous };
+      delete next[name];
+      return next;
+    });
+    setFailure(undefined);
+  }
+
+  /** Which fields differ from the record, which decides the reasons offered. */
+  const changedFields = useMemo(() => {
+    if (mode === 'create' || wire === undefined) return true;
+    return (
+      String(values['alpha3_code'] ?? '') !== wire.alpha3_code ||
+      String(values['numeric_code'] ?? '') !== wire.numeric_code ||
+      String(values['name'] ?? '') !== wire.name ||
+      String(values['official_name'] ?? '') !== wire.official_name
+    );
+  }, [mode, wire, values]);
+
+  function validate(): boolean {
+    const errors: Record<string, string> = {};
+    for (const field of countryMeta.fields) {
+      if (!field.required) continue;
+      if (String(values[field.name] ?? '').trim().length === 0) {
+        errors[field.name] = t('validation.required');
+      }
+    }
+    // The ISO codes are what the record is indexed by, so their shape matters
+    // more than most fields.
+    const alpha2 = String(values['alpha2_code'] ?? '').trim();
+    if (mode === 'create' && !/^[A-Za-z]{2}$/.test(alpha2)) {
+      errors['alpha2_code'] = t('country.invalidAlpha2');
+    }
+    if (String(values['alpha3_code'] ?? '').trim().length > 0 && !/^[A-Za-z]{3}$/.test(String(values['alpha3_code']).trim())) {
+      errors['alpha3_code'] = t('country.invalidAlpha3');
+    }
+    if (String(values['numeric_code'] ?? '').trim().length > 0 && !/^[0-9]{3}$/.test(String(values['numeric_code']).trim())) {
+      errors['numeric_code'] = t('country.invalidNumeric');
+    }
+    setValidation(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function submit(result: ChangeReasonResult): void {
+    setFailure(undefined);
+    const payload =
+      mode === 'create' || wire === undefined
+        ? newCountry({
+            alpha2Code: String(values['alpha2_code'] ?? '').trim().toUpperCase(),
+            alpha3Code: String(values['alpha3_code'] ?? '').trim().toUpperCase(),
+            numericCode: String(values['numeric_code'] ?? '').trim(),
+            name: String(values['name'] ?? '').trim(),
+            officialName: String(values['official_name'] ?? '').trim(),
+            changeReasonCode: result.reasonCode,
+            changeCommentary: result.commentary,
+          })
+        : applyEdit(wire, {
+            alpha3Code: String(values['alpha3_code'] ?? '').trim().toUpperCase(),
+            numericCode: String(values['numeric_code'] ?? '').trim(),
+            name: String(values['name'] ?? '').trim(),
+            officialName: String(values['official_name'] ?? '').trim(),
+            version: wire.version,
+            changeReasonCode: result.reasonCode,
+            changeCommentary: result.commentary,
+          });
+
+    save.mutate(
+      { data: payload, reasonCode: result.reasonCode, commentary: result.commentary },
+      {
+        onSuccess: () => {
+          setStage(undefined);
+          setTouched(false);
+          navigate(`/refdata/country/${String(payload.alpha2_code)}`);
+        },
+        onError: (error: unknown) => {
+          setFailure(error instanceof Error ? error.message : t('feedback.saveFailed'));
+          setStage(undefined);
+        },
+      },
+    );
+  }
+
+  function confirmDelete(): void {
+    const code = wire?.alpha2_code ?? '';
+    remove.mutate(code, {
+      onSuccess: () => {
+        setStage(undefined);
+        navigate('/refdata/country');
+      },
+      onError: (error: unknown) => {
+        setFailure(error instanceof Error ? error.message : t('feedback.deleteFailed'));
+        setStage(undefined);
+      },
+    });
+  }
+
+  if (mode === 'read' && query.isSuccess && current === undefined) {
     return (
       <div className="mx-auto max-w-[680px] px-5 py-16 text-center">
         <h1 className="text-lg font-semibold tracking-tight">{id}</h1>
@@ -32,14 +181,89 @@ export function CountryDetailPage(): ReactNode {
     );
   }
 
+  const title =
+    mode === 'create'
+      ? t('country.newTitle')
+      : String(values['name'] ?? '') || t('country.singular');
+
   return (
-    <EntityDetailPage<CountryRow>
-      meta={countryMeta}
-      groups={countryFieldGroups}
-      row={country}
-      mode="read"
-      load={(row) => row}
-      displayName={(row) => `${String(row['name'] ?? '')} (${String(row['alpha2_code'] ?? '')})`}
-    />
+    <>
+      <EntityDetailPage
+        meta={countryMeta}
+        groups={countryFieldGroups}
+        values={values}
+        mode={mode}
+        title={title}
+        {...(mode === 'read' ? {} : { subtitle: String(values['alpha2_code'] ?? '') })}
+        validationErrors={validation}
+        {...(failure === undefined ? {} : { failureMessage: failure })}
+        pending={save.isPending || remove.isPending}
+        onChange={change}
+        onSave={() => {
+          if (validate()) setStage('reason');
+        }}
+        onEdit={() => navigate(`/refdata/country/${String(id ?? '')}/edit`)}
+        onCancel={() => {
+          setTouched(false);
+          navigate(`/refdata/country/${String(id ?? '')}`);
+        }}
+        onDelete={() => setStage('delete')}
+        onHistory={() => navigate(`/refdata/country/${String(id ?? '')}/history`)}
+      />
+
+      {stage === 'reason' && (
+        <ChangeReasonDialog
+          operation={mode === 'create' ? 'create' : 'amend'}
+          hasChanges={changedFields}
+          reasons={reasons.data ?? []}
+          pending={save.isPending}
+          onConfirm={submit}
+          onCancel={() => setStage(undefined)}
+        />
+      )}
+
+      {stage === 'delete' && (
+        <ConfirmDialog
+          title={t('confirmation.deleteTitle', { singular: t('country.singular') })}
+          body={t('confirmation.deleteBody', {
+            singular: t('country.singular'),
+            name: String(values['alpha2_code'] ?? ''),
+          })}
+          confirmLabel={t('entity.delete')}
+          pending={false}
+          onCancel={() => setStage(undefined)}
+          onConfirm={() => setStage('delete-reason')}
+        />
+      )}
+
+      {stage === 'delete-reason' && (
+        <ChangeReasonDialog
+          operation="delete"
+          hasChanges={false}
+          reasons={reasons.data ?? []}
+          pending={remove.isPending}
+          onConfirm={confirmDelete}
+          onCancel={() => setStage(undefined)}
+        />
+      )}
+    </>
   );
+}
+
+/** The record as the form works with it, by wire field name. */
+function recordFrom(wire: WireCountry | undefined): Record<string, unknown> {
+  if (wire === undefined) return {};
+  return {
+    version: wire.version,
+    alpha2_code: wire.alpha2_code,
+    alpha3_code: wire.alpha3_code,
+    numeric_code: wire.numeric_code,
+    name: wire.name,
+    official_name: wire.official_name,
+    modified_by: wire.modified_by,
+    performed_by: wire.performed_by,
+    recorded_at: wire.recorded_at,
+    change_reason_code: wire.change_reason_code,
+    change_commentary: wire.change_commentary,
+  };
 }
