@@ -8,6 +8,10 @@ import {
   accountPageSchema,
   deleteAccount,
   listAccountsRequestSchema,
+  SUBJECTS,
+  listCountriesRequestSchema,
+  countryPageSchema,
+  mapCountry,
   loginResultSchema,
   selectPartyRequestSchema,
   sessionViewSchema,
@@ -339,6 +343,34 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
     const page = await session.client.listAccounts(input);
     return { accounts: page.accounts, totalCount: page.totalCount };
+  });
+
+  /**
+   * Lists one page of countries.
+   *
+   * The same shape as the accounts route above, deliberately: every entity list
+   * takes offset and limit, returns the page and the total, and maps the wire
+   * shape to the interface's own. A hundred entities with a hundred route shapes
+   * is a hundred chances to differ.
+   */
+  server.get('/api/countries', async (request) => {
+    const session = requireSession(request);
+    const query = request.query as Record<string, string | undefined>;
+    const input = listCountriesRequestSchema.parse({
+      offset: query['offset'] === undefined ? 0 : Number(query['offset']),
+      limit: query['limit'] === undefined ? 100 : Number(query['limit']),
+      as_of: query['asOf'] ?? '',
+    });
+
+    const raw = await session.client.callAuthenticated(
+      SUBJECTS.listCountries,
+      input,
+      countryPageSchema,
+    );
+    return {
+      countries: raw.countries.map(mapCountry),
+      totalCount: raw.total_available_count,
+    };
   });
 
   server.post('/api/accounts/:id/lock', async (request) => {

@@ -48,6 +48,14 @@ export type {
   SessionView,
 } from './contracts.js';
 
+export {
+  countryPageSchema,
+  listCountriesRequestSchema,
+  wireCountrySchema,
+} from './entities/country.js';
+export type { Country, WireCountry, WireCountryPage } from './entities/country.js';
+export { mapCountry } from './entities/country.js';
+
 // Subjects, so a browser-side module can name one without importing the
 // transport that would know how to reach it.
 export { SUBJECTS } from './operations.js';

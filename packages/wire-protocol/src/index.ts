@@ -106,6 +106,14 @@ export type {
 } from './operations.js';
 
 export {
+  countryPageSchema,
+  listCountriesRequestSchema,
+  wireCountrySchema,
+} from './entities/country.js';
+export type { Country, WireCountry, WireCountryPage } from './entities/country.js';
+export { mapCountry } from './entities/country.js';
+
+export {
   ACCOUNT_SUBJECTS,
   changeOwnPassword,
   deleteAccount,

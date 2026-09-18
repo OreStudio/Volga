@@ -1,4 +1,4 @@
-import type { SourceCatalogue } from '../translate.js';
+import { flatten, type SourceCatalogue } from '../translate.js';
 
 /**
  * English, the source catalogue.
@@ -24,6 +24,22 @@ export const en: SourceCatalogue = {
     menu: 'Menu',
     closeMenu: 'Close menu',
     language: 'Language',
+    iam: 'IAM',
+    refdata: 'Reference data',
+    trading: 'Trading',
+    marketdata: 'Market data',
+    reporting: 'Reporting',
+    dataquality: 'Data quality',
+    compute: 'Compute',
+    workflow: 'Workflow',
+    platform: 'Platform',
+    collapse: 'Collapse',
+    expand: 'Expand',
+    home: 'Home',
+    search: 'Search',
+    searchHint: 'Search entities and actions',
+    noResults: 'Nothing matches.',
+    allEntities: 'All entities',
   },
 
   landing: {
@@ -165,6 +181,7 @@ export const en: SourceCatalogue = {
     requiredFields: 'Please fill in all required fields.',
     notConnected: 'Not connected to server. Please login.',
     sessionExpired: 'Your session has ended. Sign in again.',
+    notFound: 'No record matches that identifier.',
     unreachable: 'Cannot reach the server.',
     retry: 'Retry',
   },
@@ -199,6 +216,75 @@ export const en: SourceCatalogue = {
     unavailable: 'This deployment does not offer the developer surface.',
   },
 
+  home: {
+    greeting: 'Signed in as {name}',
+    quickActions: 'Quick actions',
+    components: 'Components',
+    entities: 'entities',
+    planned: 'planned',
+    whatIs: 'What is here',
+  },
+
+  component: {
+    entities: 'Entities',
+    shortcuts: 'Common tasks',
+    noEntities: 'No entities are declared for this component yet.',
+  },
+
+  shortcut: {
+    accounts: { title: 'Accounts', description: 'Add, amend and lock the accounts that can sign in.' },
+    orgChart: { title: 'Org chart', description: 'See who reports to whom.' },
+    onboardTenant: { title: 'Onboard tenant', description: 'Provision a new tenant and its first party.' },
+    parties: { title: 'Parties', description: 'The organisations you trade with and belong to.' },
+    currencies: { title: 'Currencies', description: 'Currency codes, rounding and market tiers.' },
+    books: { title: 'Books', description: 'The books trades are recorded against.' },
+    trades: { title: 'Trades', description: 'Captured trades and their lifecycle events.' },
+    portfolios: { title: 'Portfolios', description: 'Hierarchies of books and positions.' },
+    marketSeries: { title: 'Market series', description: 'Time series of market observations.' },
+    fixings: { title: 'Fixings', description: 'Published fixings and their details.' },
+    reportDefinitions: { title: 'Report definitions', description: 'What can be run, and with what parameters.' },
+    reportInstances: { title: 'Report instances', description: 'Reports that have been generated.' },
+    catalog: { title: 'Catalog', description: 'Every dataset and where it came from.' },
+    codingSchemes: { title: 'Coding schemes', description: 'Controlled vocabularies and their codes.' },
+    computeDashboard: { title: 'Dashboard', description: 'What is running and what is queued.' },
+    queues: { title: 'Queues', description: 'Work waiting to be picked up.' },
+    workflowDefinitions: { title: 'Definitions', description: 'The workflows that can be started.' },
+    scheduler: { title: 'Scheduler', description: 'Jobs and when they next run.' },
+  },
+
+  card: {
+    planned: 'Planned',
+    notBuilt: 'Not built yet',
+  },
+
+  breadcrumb: {
+    home: 'Home',
+  },
+
+  country: {
+    title: 'Countries',
+    description: 'Countries, their ISO codes and their official names.',
+    colAlpha2Code: 'Alpha-2 code',
+    colAlpha3Code: 'Alpha-3 code',
+    colNumericCode: 'Numeric code',
+    colName: 'Name',
+    colOfficialName: 'Official name',
+    colVersion: 'Version',
+    colModifiedBy: 'Modified by',
+    colRecordedAt: 'Recorded at',
+    searchPlaceholder: 'Alpha-2, alpha-3, numeric code or name',
+    fldAlpha2Code: 'Alpha-2 code',
+    fldAlpha3Code: 'Alpha-3 code',
+    fldNumericCode: 'Numeric code',
+    fldName: 'Name',
+    fldOfficialName: 'Official name',
+    alpha2CodePh: 'Enter country alpha2 code',
+    alpha3CodePh: 'Enter country alpha3 code',
+    numericCodePh: 'Enter ISO numeric code',
+    namePh: 'Enter display name',
+    officialNamePh: 'Enter official country name',
+  },
+
   common: {
     loading: 'Loading...',
     all: 'All',
@@ -209,3 +295,6 @@ export const en: SourceCatalogue = {
     back: 'Back',
   },
 };
+
+/** The English catalogue, flattened to dot paths. */
+export const enFlat = flatten(en);

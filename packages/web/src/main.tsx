@@ -1,18 +1,21 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
-import {
-  AppProviders,
-  SessionProvider,
-  createQueryClient,
-  useSession,
-} from './session/SessionProvider.js';
-import { AppChrome } from './AppShell.js';
+import { AppProviders, SessionProvider, createQueryClient, useSession } from './session/SessionProvider.js';
+import { TranslationProvider } from './i18n/Provider.js';
+import { AppShell } from './components/AppShell.js';
+import { PublicShell } from './components/PublicShell.js';
+import { HomePage, PlannedPage } from './components/pages/HomePage.js';
+import { ComponentPage } from './components/pages/ComponentPage.js';
+import { COMPONENTS, PLATFORM_COMPONENTS } from './components/registry.js';
+import { humanise } from './components/labels.js';
 import { LandingPage } from './pages/LandingPage.js';
 import { SignUpPage } from './pages/SignUpPage.js';
 import { DeveloperPage } from './pages/DeveloperPage.js';
 import { SignInPage } from './pages/SignInPage.js';
 import { AccountsPage } from './pages/AccountsPage.js';
+import { CountryListPage } from './components/refdata/entities/country/CountryListPage.js';
+import { CountryDetailPage } from './components/refdata/entities/country/CountryDetailPage.js';
 import './styles.css';
 
 /**
@@ -22,13 +25,43 @@ import './styles.css';
  * about choosing where to connect. A visitor lands, signs in if they have an
  * account, and that is the whole journey.
  */
-
 const queryClient = createQueryClient();
 
 /** The sign-in screen, which gets out of the way once there is a session. */
 function SignInRoute(): ReactNode {
   const { state } = useSession();
-  return state.status === 'authenticated' ? <Navigate to="/accounts" replace /> : <SignInPage />;
+  return state.status === 'authenticated' ? <Navigate to="/" replace /> : <SignInPage />;
+}
+
+/** Wraps a screen so it is only reachable with a session. */
+function guarded(element: ReactNode): ReactNode {
+  return <Guarded>{element}</Guarded>;
+}
+
+function Guarded({ children }: { readonly children: ReactNode }): ReactNode {
+  const { state } = useSession();
+  return state.status === 'authenticated' ? children : <Navigate to="/login" replace />;
+}
+
+/**
+ * A screen for an entity whose own screen is not built yet.
+ *
+ * The routes exist for every declared entity so the navigation is complete and a
+ * person can see the shape of the system. The ones without a screen say so
+ * instead of rendering an empty table.
+ */
+function plannedRoutes(): readonly ReactNode[] {
+  return COMPONENTS.flatMap((component) =>
+    component.entities
+      .filter((entity) => entity.planned === true)
+      .map((entity) => (
+        <Route
+          key={`${component.id}/${entity.id}`}
+          path={`${component.path}/${entity.path}`}
+          element={guarded(<PlannedPage title={humanise(entity.id)} />)}
+        />
+      )),
+  );
 }
 
 function App(): ReactNode {
@@ -36,34 +69,82 @@ function App(): ReactNode {
 
   if (state.status === 'loading') {
     return (
-      <div className="grid min-h-full place-items-center">
+      <div className="grid min-h-full place-items-center bg-bg-primary">
         <span className="text-sm text-ink-faint">Loading...</span>
       </div>
     );
   }
 
+  const authenticated = state.status === 'authenticated';
+
   return (
-    <AppChrome>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<SignInRoute />} />
-        <Route path="/signup" element={<SignUpPage />} />
-        {/* The deployment's plumbing is only for whoever is signed in. */}
-        <Route
-          path="/deployment"
-          element={
-            state.status === 'authenticated' ? <DeveloperPage /> : <Navigate to="/login" replace />
-          }
-        />
-        <Route
-          path="/accounts"
-          element={
-            state.status === 'authenticated' ? <AccountsPage /> : <Navigate to="/login" replace />
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppChrome>
+    <Routes>
+      {/*
+        Two shells, because the two situations have nothing in common. A visitor
+        gets a hero and one action; a signed-in person gets navigation.
+      */}
+      {authenticated ? (
+        <Route element={<AppShell />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/iam/account" element={<AccountsPage />} />
+
+          {/* The first entity on the shared machinery. Every other entity will
+              look exactly like this: a list page and a detail page, both thin.
+              The identity is the natural key, so :id is the alpha-2 code. */}
+          <Route path="/refdata/country" element={<CountryListPage />} />
+
+          {/* A landing page per component, with its tasks and its entities. */}
+          {COMPONENTS.map((component) => (
+            <Route
+              key={component.id}
+              path={component.path}
+              element={<ComponentPage />}
+            />
+          ))}
+          {PLATFORM_COMPONENTS.map((component) => (
+            <Route
+              key={component.id}
+              path={`${component.path}/deployment`}
+              element={<DeveloperPage />}
+            />
+          ))}
+
+          {plannedRoutes()}
+
+          {/*
+            Entity detail routes. React Router 8 does not support a regular
+            expression in a path, so an unknown code is handled by the screen
+            rather than excluded by the route: a record that is not found says so,
+            which is better than a route that matches nothing and shows nothing.
+          */}
+          <Route path="/refdata/country/:id" element={<CountryDetailPage />} />
+        </Route>
+      ) : (
+        <>
+          <Route
+            path="/"
+            element={
+              <PublicShell>
+                <LandingPage />
+              </PublicShell>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicShell>
+                <SignUpPage />
+              </PublicShell>
+            }
+          />
+          <Route path="/login" element={<SignInRoute />} />
+        </>
+      )}
+
+      {/* A signed-in person asking for the sign-in screen is already in. */}
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -75,11 +156,13 @@ if (container === null) {
 createRoot(container).render(
   <StrictMode>
     <AppProviders queryClient={queryClient}>
-      <SessionProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </SessionProvider>
+      <TranslationProvider>
+        <SessionProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </SessionProvider>
+      </TranslationProvider>
     </AppProviders>
   </StrictMode>,
 );

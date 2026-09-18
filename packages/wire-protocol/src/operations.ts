@@ -18,6 +18,7 @@ export const SUBJECTS = {
   selectParty: 'iam.v1.accounts.select-party',
   switchParty: 'iam.v1.accounts.switch-party',
   listAccounts: 'iam.v1.accounts.list',
+  listCountries: 'refdata.v1.countries.list',
   httpInfo: 'http-server.v1.info.get',
 } as const;
 

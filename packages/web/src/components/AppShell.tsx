@@ -1,0 +1,66 @@
+import { useState, type ReactNode } from 'react';
+import { Outlet, useLocation } from 'react-router';
+import { Sidebar } from './Sidebar.js';
+import { TopBar } from './TopBar.js';
+import { cx } from '../ui/Primitives.js';
+
+/**
+ * The signed-in shell.
+ *
+ * A sidebar of components, a bar of application-level things, and the screen.
+ * The Qt client was a menu bar over a desktop of floating windows; on the web the
+ * navigation is a place you can see and the screen is a route you can link to.
+ *
+ * The sidebar collapses on a narrow window, because a permanent 260px column on a
+ * laptop takes a third of the width for something you use occasionally.
+ */
+export function AppShell(): ReactNode {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  return (
+    <div className="flex h-full flex-col bg-bg-primary">
+      <TopBar onOpenMenu={() => setMenuOpen((open) => !open)} />
+
+      <div className="flex min-h-0 flex-1">
+        {/* Permanent from lg up, a drawer below it. */}
+        <aside
+          className={cx(
+            'w-64 shrink-0 border-r border-line bg-bg-secondary',
+            'max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 max-lg:transition-transform',
+            menuOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',
+          )}
+        >
+          <div className="flex h-13 items-center border-b border-line px-3 lg:hidden">
+            <span className="text-sm font-medium">Menu</span>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              className="ml-auto rounded-md px-2 py-1 text-sm text-ink-muted hover:text-ink"
+            >
+              Close
+            </button>
+          </div>
+          <div className="h-[calc(100%-3.25rem)] lg:h-full">
+            <Sidebar onNavigate={() => setMenuOpen(false)} />
+          </div>
+        </aside>
+
+        {menuOpen && (
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
+
+        {/* The key remounts the screen on navigation, so scroll position and any
+            local state belong to the route rather than leaking across it. */}
+        <main key={pathname} className="min-w-0 flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}

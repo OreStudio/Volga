@@ -23,6 +23,22 @@ const pt: SourceCatalogue = {
     menu: 'Menu',
     closeMenu: 'Fechar menu',
     language: 'Idioma',
+     iam: 'IAM',
+    refdata: 'Dados de referência',
+    trading: 'Negociação',
+    marketdata: 'Dados de mercado',
+    reporting: 'Relatórios',
+    dataquality: 'Qualidade de dados',
+    compute: 'Cálculo',
+    workflow: 'Fluxos de trabalho',
+    platform: 'Plataforma',
+    collapse: 'Recolher',
+    expand: 'Expandir',
+    home: 'Início',
+    search: 'Pesquisar',
+    searchHint: 'Pesquisar entidades e ações',
+    noResults: 'Nada corresponde.',
+    allEntities: 'Todas as entidades',
   },
 
   landing: {
@@ -160,6 +176,7 @@ const pt: SourceCatalogue = {
     requiredFields: 'Preencha todos os campos obrigatórios.',
     notConnected: 'Sem ligação ao servidor. Inicie sessão.',
     sessionExpired: 'A sua sessão terminou. Inicie sessão novamente.',
+    notFound: 'Nenhum registo corresponde a esse identificador.',
     unreachable: 'Não é possível contactar o servidor.',
     retry: 'Tentar novamente',
   },
@@ -195,6 +212,75 @@ const pt: SourceCatalogue = {
     unavailable: 'Esta implementação não disponibiliza a área de programador.',
   },
 
+  home: {
+    greeting: 'Sessão iniciada como {name}',
+    quickActions: 'Ações rápidas',
+    components: 'Componentes',
+    entities: 'entidades',
+    planned: 'planeadas',
+    whatIs: 'O que existe aqui',
+  },
+
+  component: {
+    entities: 'Entidades',
+    shortcuts: 'Tarefas comuns',
+    noEntities: 'Ainda não há entidades declaradas para este componente.',
+  },
+
+  shortcut: {
+    accounts: { title: 'Contas', description: 'Adicione, altere e bloqueie as contas que podem iniciar sessão.' },
+    orgChart: { title: 'Organograma', description: 'Veja quem reporta a quem.' },
+    onboardTenant: { title: 'Aprovisionar inquilino', description: 'Crie um novo inquilino e a sua primeira entidade.' },
+    parties: { title: 'Entidades', description: 'As organizações com quem negoceia e a que pertence.' },
+    currencies: { title: 'Moedas', description: 'Códigos de moeda, arredondamento e escalões de mercado.' },
+    books: { title: 'Carteiras', description: 'As carteiras onde as operações são registadas.' },
+    trades: { title: 'Operações', description: 'Operações capturadas e os seus eventos de ciclo de vida.' },
+    portfolios: { title: 'Portfólios', description: 'Hierarquias de carteiras e posições.' },
+    marketSeries: { title: 'Séries de mercado', description: 'Séries temporais de observações de mercado.' },
+    fixings: { title: 'Fixings', description: 'Fixings publicados e os seus detalhes.' },
+    reportDefinitions: { title: 'Definições de relatório', description: 'O que pode ser executado e com que parâmetros.' },
+    reportInstances: { title: 'Instâncias de relatório', description: 'Relatórios já gerados.' },
+    catalog: { title: 'Catálogo', description: 'Todos os conjuntos de dados e a sua origem.' },
+    codingSchemes: { title: 'Esquemas de codificação', description: 'Vocabulários controlados e os seus códigos.' },
+    computeDashboard: { title: 'Painel', description: 'O que está a correr e o que está em fila.' },
+    queues: { title: 'Filas', description: 'Trabalho à espera de ser recolhido.' },
+    workflowDefinitions: { title: 'Definições', description: 'Os fluxos de trabalho que podem ser iniciados.' },
+    scheduler: { title: 'Agendador', description: 'Tarefas e quando correm a seguir.' },
+  },
+
+  card: {
+    planned: 'Planeado',
+    notBuilt: 'Ainda não construído',
+  },
+
+  breadcrumb: {
+    home: 'Início',
+  },
+
+  country: {
+    title: 'Países',
+    description: 'Países, os seus códigos ISO e os seus nomes oficiais.',
+    colAlpha2Code: 'Código alfa-2',
+    colAlpha3Code: 'Código alfa-3',
+    colNumericCode: 'Código numérico',
+    colName: 'Nome',
+    colOfficialName: 'Nome oficial',
+    colVersion: 'Versão',
+    colModifiedBy: 'Modificado por',
+    colRecordedAt: 'Registado em',
+    searchPlaceholder: 'Código alfa-2, alfa-3, numérico ou nome',
+    fldAlpha2Code: 'Código alfa-2',
+    fldAlpha3Code: 'Código alfa-3',
+    fldNumericCode: 'Código numérico',
+    fldName: 'Nome',
+    fldOfficialName: 'Nome oficial',
+    alpha2CodePh: 'Introduza o código alfa-2 do país',
+    alpha3CodePh: 'Introduza o código alfa-3 do país',
+    numericCodePh: 'Introduza o código numérico ISO',
+    namePh: 'Introduza o nome a apresentar',
+    officialNamePh: 'Introduza o nome oficial do país',
+  },
+
   common: {
     loading: 'A carregar...',
     all: 'Todos',
@@ -211,3 +297,6 @@ const pt: SourceCatalogue = {
 // Portuguese speaker.
 catalogueSchema(flatten(source)).parse(flatten(pt));
 export { pt };
+
+/** The catalogue, flattened to dot paths. */
+export const ptFlat = flatten(pt);
