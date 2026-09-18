@@ -16,7 +16,7 @@ import {
   type LoginOutcome,
   type PartySummary,
 } from '@volga/protocol';
-import { credentialsSchema, siteStateSchema } from '@volga/contracts';
+import { credentialsSchema, deploymentViewSchema, siteStateSchema } from '@volga/contracts';
 import {
   tlsMaterialFor,
   type LoadedSiteConfiguration,
@@ -217,6 +217,32 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         : [],
     }),
   );
+
+  /**
+   * The deployment's plumbing, for the developer page.
+   *
+   * Absent unless the deployment offers the developer surface, because it names
+   * the host, the port and the namespace, and there is no reason for an
+   * ordinary deployment to expose any of that to a browser.
+   */
+  server.get('/api/site/deployment', async (_request, reply) => {
+    if (!site.configuration.developerTools) {
+      return reply.status(404).send({
+        code: 'invalid-request',
+        message: 'No developer surface on this deployment.',
+      });
+    }
+    return deploymentViewSchema.parse({
+      environment: site.environment,
+      configFile: site.source,
+      developerTools: site.configuration.developerTools,
+      available: site.configuration.environments.map((environment) => ({
+        id: environment.id,
+        displayName: environment.displayName,
+        nonProduction: environment.nonProduction,
+      })),
+    });
+  });
 
   server.post('/api/session', async (request, reply) => {
     const parsed = credentialsSchema.safeParse(request.body);

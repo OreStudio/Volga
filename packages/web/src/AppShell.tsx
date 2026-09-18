@@ -1,88 +1,109 @@
 import { type ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 import { useSession } from './session/SessionProvider.js';
 import { useSiteState } from './api/site.js';
-import { Button, Tag } from './ui/Primitives.js';
+import { Button, Tag, cx } from './ui/Primitives.js';
+import { PROJECT_SITE } from './assets/brand.js';
 import icon from './assets/ore-studio-icon.png';
 
 /**
  * The application chrome.
  *
- * The header names the environment, permanently. That is the one fact a person
- * should never have to wonder about, because the cost of mistaking one
- * environment for another is high and the cost of a persistent label is a few
- * pixels.
+ * A header with the mark and the menu, and a footer carrying the environment on
+ * the left and the copyright on the right. The environment sits there rather
+ * than in the header because it is a small, permanent fact about the
+ * deployment, not an action, and because the worst failure mode is not knowing
+ * which environment you are looking at.
  */
 export function AppChrome({ children }: { readonly children: ReactNode }): ReactNode {
   const { state, signOut } = useSession();
   const { site } = useSiteState();
+  const location = useLocation();
   const authenticated = state.status === 'authenticated';
 
   return (
-    <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-line bg-bg-primary/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[920px] items-center gap-4 px-5 py-3">
-          <NavLink to="/" className="flex items-center gap-2.5">
+    <div className="flex min-h-full flex-col">
+      <header className="border-b border-line">
+        <div className="mx-auto flex max-w-[1100px] items-center gap-6 px-6 py-4">
+          <Link to="/" className="flex items-center gap-2.5">
             <img src={icon} alt="" className="size-7 rounded-md" />
             <span className="text-sm font-semibold tracking-tight">ORE Studio</span>
-          </NavLink>
-
-          {site !== undefined && (
-            <span className="flex items-center gap-2">
-              <span className="text-sm text-ink-muted">{site.environment.displayName}</span>
-              {site.environment.nonProduction && <Tag tone="warn">development</Tag>}
-            </span>
-          )}
+          </Link>
 
           <nav className="ml-auto flex items-center gap-1" aria-label="Main">
+            <HeaderLink to="/about">About ORE Studio</HeaderLink>
+            {site?.developerTools === true && (
+              <HeaderLink to="/deployment">Deployment</HeaderLink>
+            )}
+
             {authenticated ? (
               <>
-                <NavItem to="/accounts">Accounts</NavItem>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void signOut()}
-                >
+                <HeaderLink to="/accounts">Accounts</HeaderLink>
+                <Button variant="ghost" size="sm" onClick={() => void signOut()}>
                   Sign out
                 </Button>
               </>
             ) : (
-              <NavLink to="/login">
-                <Button variant="primary" size="sm">
-                  Sign in
-                </Button>
-              </NavLink>
+              <>
+                <Link to="/signup">
+                  <Button variant="secondary" size="sm">
+                    Sign up
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button variant="primary" size="sm">
+                    Sign in
+                  </Button>
+                </Link>
+              </>
             )}
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[920px] px-5 py-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1100px] flex-1 px-6 py-10">{children}</main>
 
-      <footer className="mx-auto max-w-[920px] px-5 pb-10 text-xs text-ink-faint">
-        © 2026 ORE Studio contributors.
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4 px-6 py-4 text-xs text-ink-faint">
+          <span className="flex items-center gap-2">
+            {site !== undefined && (
+              <>
+                <span>{site.environment.displayName}</span>
+                {site.environment.nonProduction && <Tag tone="warn">development</Tag>}
+              </>
+            )}
+          </span>
+          <span>© 2026 ORE Studio contributors.</span>
+        </div>
       </footer>
     </div>
   );
 }
 
-function NavItem({ to, children }: { readonly to: string; readonly children: ReactNode }): ReactNode {
+function HeaderLink({ to, children }: { readonly to: string; readonly children: ReactNode }): ReactNode {
+  const location = useLocation();
+  const isExternal = to.startsWith('http');
+  const base = 'rounded-md px-3 py-1.5 text-sm transition-colors';
+
+  if (isExternal) {
+    return (
+      <a href={to} target="_blank" rel="noreferrer" className={cx(base, 'text-ink-muted hover:text-ink')}>
+        {children}
+      </a>
+    );
+  }
   return (
     <NavLink
       to={to}
-      className={({ isActive }) =>
-        `rounded-md px-3 py-1.5 text-sm transition-colors ${
-          isActive ? 'text-ink' : 'text-ink-muted hover:text-ink'
-        }`
-      }
+      className={cx(
+        base,
+        location.pathname === to ? 'text-ink' : 'text-ink-muted hover:text-ink',
+      )}
     >
       {children}
     </NavLink>
   );
 }
 
-/** The signed-in person, for a screen that wants to say who they are. */
-export function useCurrentUser(): string | null {
-  const { state } = useSession();
-  return state.status === 'authenticated' ? state.session.username : null;
-}
+/** The project site, so a link to it is one edit. */
+export { PROJECT_SITE };

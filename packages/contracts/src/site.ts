@@ -152,3 +152,27 @@ export const siteStateSchema = z.object({
   developerAccounts: z.array(developerAccountSchema),
 });
 export type SiteState = z.infer<typeof siteStateSchema>;
+
+/**
+ * The deployment's plumbing, for the developer page.
+ *
+ * A separate shape from {@link SiteState} on purpose. The ordinary interface is
+ * never told the host, the port or the namespace; this is served only when the
+ * deployment has the developer surface switched on, and it exists so a
+ * developer can see what they are actually connected to.
+ */
+export const deploymentViewSchema = z.object({
+  environment: environmentSchema,
+  configFile: z.string(),
+  /** Whether the environment was chosen on the command line or in the file. */
+  developerTools: z.boolean(),
+  /** Every environment the configuration declares, so the others are visible. */
+  available: z.array(
+    z.object({
+      id: z.string(),
+      displayName: z.string(),
+      nonProduction: z.boolean(),
+    }),
+  ),
+});
+export type DeploymentView = z.infer<typeof deploymentViewSchema>;

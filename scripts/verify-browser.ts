@@ -57,15 +57,39 @@ async function main(): Promise<number> {
   await page.waitForSelector('h1', { timeout: 15_000 });
   const landing = (await page.textContent('body')) ?? '';
   check('a landing page is the entry point', landing.includes('Enterprise-grade risk analytics'));
-  check('it names the environment', landing.includes('Festive Dijkstra'));
-  check('it marks a development environment', landing.includes('development'));
-  check('it links to the project site', await page.isVisible('a[href*="orestudio.github.io"]'));
+  check('the hero artwork is shown', await page.isVisible('figure img'));
+  check('there is no prose blurb', !landing.includes('What is here'));
   check('no session is open yet', (await context.cookies()).every((c) => c.name !== 'volga_session'));
   await screenshot(page, '30-landing');
 
+  console.log('\nthe header and footer:');
+  check('About ORE Studio is a menu option', await page.isVisible('a[href="/about"]'));
+  check('the Deployment option is offered', await page.isVisible('a[href="/deployment"]'));
+  check('a sign up button is offered', await page.isVisible('a[href="/signup"]'));
+  check('a sign in button is offered', await page.isVisible('a[href="/login"]'));
+  // The environment is a small permanent marker rather than a field, so it
+  // belongs in the footer beside the copyright.
+  const footer = (await page.textContent('footer')) ?? '';
+  check('the environment is a footer marker', footer.includes('Festive Dijkstra'), footer.trim());
+  check('the footer carries the copyright', footer.includes('©'));
+  check('it marks a development environment', footer.includes('development'));
+
+  console.log('\nthe deployment page:');
+  await page.goto(`${APP_URL}deployment`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('h1', { timeout: 15_000 });
+  const deployment = (await page.textContent('body')) ?? '';
+  check('it names the environment', deployment.includes('Festive Dijkstra'));
+  check('it shows where it points', deployment.includes('21805'));
+  check('it shows the namespace', deployment.includes('ores.dev.festive.dijkstra'));
+  check('it shows the configuration file', deployment.includes('environments.json'));
+  // The identifiers are the point of that table, since they are what you type
+  // on the command line.
+  check('it lists the other environments by identifier', deployment.includes('brave_hopper'));
+  await screenshot(page, '33-deployment');
+
   console.log('\nnothing about connections is offered:');
-  for (const gone of ['Connections', 'Import', 'Export', 'Environment server', 'Namespace']) {
-    check(`'${gone}' does not appear`, !landing.includes(gone));
+  for (const gone of ['Connections', 'Import', 'Export', 'Master password', 'Quick connect']) {
+    check(`'${gone}' does not appear in the landing page`, !landing.includes(gone));
   }
 
   console.log('\nthe sign-in screen:');

@@ -42,6 +42,26 @@ The process logs which environment it serves as its first line, because the
 worst failure mode is not knowing whether you are looking at staging or
 production. The interface repeats it in the header, permanently.
 
+## The interface
+
+A landing page, an ordinary login form, and the account screens. The header
+carries the mark, a link to the project site, a Deployment page when the
+deployment offers it, and Sign in and Sign up.
+
+The environment is a small permanent marker in the footer beside the copyright,
+not a field and not a header item. It is there because the worst failure mode is
+not knowing which environment you are looking at, and it is small because it is
+not an action.
+
+The landing page takes its palette, type scale and content column from the
+project site at orestudio.github.io, since a link from there arrives here.
+
+The Deployment page holds everything a person signing in should not have to
+think about: which environment this process serves, where it points, which file
+chose it, and what else that file declares. It is served only when the
+deployment has the developer surface switched on, because it names the host, the
+port and the namespace.
+
 ## Architecture
 
 ```
@@ -92,8 +112,9 @@ all. A well-formed rejection therefore proves the subject, the encoding, and
 the response schema in one step.
 
 `scripts/verify-browser.ts` drives a real browser through the landing page, the
-sign-in screen, a rejected credential, sign-in and sign-out, and asserts that
-nothing about connections, servers or namespaces appears anywhere. It captures
+Deployment page, the sign-in screen, a rejected credential, sign-in and
+sign-out. It asserts the absence as well as the presence: no server field, no
+namespace, no connection chooser and no master password anywhere. It captures
 screenshots under `.runtime/screenshots/`.
 
 Unit tests cover the pieces that must not drift, including a golden-bytes test

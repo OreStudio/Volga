@@ -35,6 +35,7 @@ const BUTTON_SIZES = {
   sm: 'h-8 px-3',
   md: 'h-9 px-4',
   lg: 'h-10 px-5',
+  xl: 'h-12 px-7 text-base',
 } as const;
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
