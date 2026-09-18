@@ -9,20 +9,23 @@ import { heroSplash } from '../assets/brand.js';
  *
  * The same layout as the project site at orestudio.github.io, and deliberately
  * so: a link from there arrives here, and the two should not feel like
- * different products. A large screenshot, then the heading and the text beneath
- * it, with the same links out.
+ * different products.
+ *
+ * The hero is centred, as it is there. That is the one thing that gives the
+ * page its shape, and left-aligning it was what made this look like a
+ * different site.
  */
 export function LandingPage(): ReactNode {
   const { state } = useSession();
   const authenticated = state.status === 'authenticated';
 
   return (
-    <article className="mx-auto max-w-[920px] pb-16">
+    <article className="mx-auto max-w-[920px] pb-16 text-center">
       <figure className="mt-4">
         <img
           src={heroSplash}
           alt="ORE Studio"
-          className="w-full rounded-[var(--radius-card)] border border-line"
+          className="mx-auto w-full rounded-[var(--radius-card)] border border-line"
         />
       </figure>
 
@@ -31,7 +34,7 @@ export function LandingPage(): ReactNode {
         but visual <em>and</em> open-source.
       </h1>
 
-      <p className="mt-6 text-lg text-ink-muted">
+      <p className="mx-auto mt-6 max-w-[68ch] text-lg text-ink-muted">
         ORE Studio wraps the{' '}
         <a
           href="https://github.com/OpenSourceRisk"
@@ -54,7 +57,7 @@ export function LandingPage(): ReactNode {
         PostgreSQL-native, C++-performance backend.
       </p>
 
-      <div className="mt-10 flex flex-wrap items-center gap-4">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
         {authenticated ? (
           <Link to="/accounts">
             <Button variant="primary" size="xl">
