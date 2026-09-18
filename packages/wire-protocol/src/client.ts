@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { WireFormat } from './codec.js';
 import { WireCodec } from './codec.js';
 import type { PartySummary } from './domain.js';
@@ -303,6 +303,35 @@ export class OresClient {
     return session.refreshInFlight;
   }
 
+  /**
+   * Listens for changes to an entity.
+   *
+   * The payload is a change notification: when it happened, which records, and
+   * whose they are. Only the time is handed on, because the time is the whole
+   * message as far as a screen is concerned — a screen needs to know that what
+   * it is showing is older than what exists, not which rows moved. The rows are
+   * worked out after the reload, from the data.
+   *
+   * Nothing is authenticated here. These are published events, not replies, so
+   * there is no session to present and no failure to report: a subscription that
+   * cannot be made is a screen that does not hear about changes, which is the
+   * behaviour it had before.
+   */
+  subscribeToEvents(relative: string, onEvent: (at: string) => void): () => void {
+    const subscribe = this.#transport.subscribe;
+    if (subscribe === undefined) {
+      return () => undefined;
+    }
+    return subscribe.call(this.#transport, relative, (payload) => {
+      try {
+        const decoded = this.#codec.decodeAs(payload, changeEventSchema);
+        onEvent(decoded.timestamp);
+      } catch {
+        // An event this build does not understand is one it cannot act on.
+      }
+    });
+  }
+
   /** Sets the workspace context sent on every subsequent authenticated call. */
   setWorkspace(context: WorkspaceContext | undefined): void {
     if (this.#session !== undefined) {
@@ -477,6 +506,20 @@ export class OresClient {
     this.#requireSession().token = token;
   }
 }
+
+/**
+ * A change notification, as the services publish it.
+ *
+ * Every member has a default: an event is news rather than a contract, and a
+ * notification that cannot be read is worth less than one that can be read
+ * partially. A missing time means the screen cannot tell whether it is stale, so
+ * it does nothing, which is the safe direction.
+ */
+const changeEventSchema = z.object({
+  timestamp: z.string().default(''),
+  alpha2_codes: z.array(z.string()).default([]),
+  tenant_id: z.string().default(''),
+});
 
 /** Reads the `X-Error` header, if the server set one. */
 function serverErrorCode(headers: Readonly<Record<string, string>>): string | undefined {

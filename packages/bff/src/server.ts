@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import { z } from 'zod';
+import { ChangeEventRegistry, type Watch } from './change-events.js';
 import {
   NatsTransport,
   OresClient,
@@ -597,6 +598,84 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       .header('content-type', image.mime_type.length > 0 ? image.mime_type : 'image/svg+xml')
       .header('cache-control', 'private, max-age=31536000, immutable')
       .send(imageBytesToBuffer(image.data));
+  });
+
+  /*
+   * One stream per session, carrying everything the interface hears about.
+   *
+   * One rather than one per screen, because a screen opening and closing must not
+   * churn connections and a person with six lists open wants one stream. The
+   * kinds already defined for it — the session ending, the party changing — are
+   * the same channel's business, because they are the same question asked by
+   * different parts of the interface.
+   */
+  /*
+   * A connection of its own for listening.
+   *
+   * Not a session's, because a subscription is shared and would die with
+   * whichever session happened to open it first, and not authenticated, because
+   * these are published events rather than replies: there is no session to
+   * present. Opened once for the process, beside the per-session clients rather
+   * than among them.
+   */
+  const eventClient = createClient();
+  void eventClient.connect().catch(() => undefined);
+  const events = new ChangeEventRegistry(eventClient.client);
+
+  server.get('/api/events', async (request, reply) => {
+    const session = requireSession(request);
+
+    /*
+     * The stream is written by hand rather than through a plugin.
+     *
+     * It is four headers and a formatted line, and the format is the contract;
+     * taking a dependency to produce it would be a dependency to keep in step
+     * with a format that does not change.
+     */
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+      // Proxies buffer by default, which turns a stream into a delivery at the
+      // end of the response.
+      'x-accel-buffering': 'no',
+    });
+
+    const send = (event: string, data: unknown): void => {
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    send('connected', { at: new Date().toISOString() });
+    events.attach(session.id, (change) => send('entity-changed', change));
+
+    // A person who navigates away, closes the tab or loses the network is a
+    // watcher who has gone, and the subscriptions they were holding have to go
+    // with them or the registry grows for the life of the process.
+    request.raw.on('close', () => {
+      events.forget(session.id);
+    });
+  });
+
+  /**
+   * Declares what a session is watching.
+   *
+   * Sent when the screen changes rather than carried on the stream, because a
+   * stream is one-way and reconnecting to change what is watched would be churn
+   * for something that changes on every navigation.
+   */
+  server.post('/api/events/watch', async (request) => {
+    const session = requireSession(request);
+    const body = z
+      .object({
+        watches: z
+          .array(z.object({ component: z.string(), entity: z.string() }))
+          .max(50)
+          .default([]),
+      })
+      .parse(request.body);
+    events.watch(session.id, session.tenantId, body.watches as readonly Watch[]);
+    return { ok: true };
   });
 
   server.addHook('onClose', async () => {

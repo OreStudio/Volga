@@ -23,6 +23,14 @@ export interface Reply {
 export interface Transport {
   request(subject: string, body: Uint8Array, headers: RequestHeaders, timeoutMs: number): Promise<Reply>;
   close(): Promise<void>;
+  /**
+   * Listens on a subject, and returns the way to stop.
+   *
+   * Optional because a transport that cannot listen is still a usable transport
+   * for everything that asks and answers; the capability is checked rather than
+   * assumed.
+   */
+  subscribe?(relative: string, onMessage: (payload: Uint8Array) => void): () => void;
 }
 
 /** mTLS material, as file paths or inline PEM. */
@@ -106,6 +114,41 @@ export class NatsTransport implements Transport {
   /** Prepends the configured prefix, matching {@code client::make_subject}. */
   absoluteSubject(relative: string): string {
     return `${this.#options.subjectPrefix}.${relative}`;
+  }
+
+  /**
+   * Listens on a subject, and returns the way to stop.
+   *
+   * The first thing here that is not a request. Change notifications are
+   * published rather than asked for, so there is nothing to reply to and no
+   * timeout: the handler is called for as long as the subscription lives.
+   *
+   * Messages are read in a subscription loop that ends when the subscription
+   * does, which is what makes the returned function sufficient to clean up.
+   * The payload is handed over undecoded, because what a message means belongs
+   * to whoever subscribed and not to the transport.
+   */
+  subscribe(relative: string, onMessage: (payload: Uint8Array) => void): () => void {
+    const connection = this.#connection;
+    if (connection === undefined || connection.isClosed()) {
+      throw new TransportError('Cannot subscribe: not connected');
+    }
+
+    const subscription = connection.subscribe(this.absoluteSubject(relative));
+
+    // Started and not awaited: this runs for the life of the subscription, and
+    // the caller's next line must not wait for a message that may never come.
+    void (async () => {
+      for await (const message of subscription) {
+        onMessage(message.data);
+      }
+    })().catch(() => {
+      // A closed connection ends the loop, which is how this is meant to stop.
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }
 
   async request(
