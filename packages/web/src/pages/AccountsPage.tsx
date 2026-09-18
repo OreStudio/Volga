@@ -1,28 +1,23 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Account } from '@volga/protocol/browser';
 import { useAccounts } from '../api/queries.js';
+import { Button, Detail, Field, Input, Notice, PageHeader, Select, Tag, cx } from '../ui/Primitives.js';
 
 /**
  * The accounts screen.
  *
  * The C++ list handler accepts `offset` and `limit` and then ignores them, so
- * this asks for a single large page and filters it in the browser. The moment
- * the server applies pagination this becomes a keyed query again; the seam is
- * the `listRequest` value below.
+ * this asks for one large page and filters in the browser. The moment the server
+ * applies pagination this becomes a keyed query again; the seam is
+ * `listRequest`.
  */
 
 const PAGE_SIZE = 500;
-
-/** Account types, matching the server's classifications. */
 const ACCOUNT_TYPES = ['user', 'service', 'algorithm', 'llm'] as const;
 
-interface Filters {
-  readonly search: string;
-  readonly accountType: string;
-}
-
 export function AccountsPage(): ReactNode {
-  const [filters, setFilters] = useState<Filters>({ search: '', accountType: '' });
+  const [search, setSearch] = useState('');
+  const [accountType, setAccountType] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const listRequest = useMemo(() => ({ offset: 0, limit: PAGE_SIZE }), []);
@@ -30,9 +25,9 @@ export function AccountsPage(): ReactNode {
 
   const rows = useMemo(() => {
     const all = data?.accounts ?? [];
-    const needle = filters.search.trim().toLowerCase();
+    const needle = search.trim().toLowerCase();
     return all.filter((account) => {
-      if (filters.accountType !== '' && account.accountType !== filters.accountType) {
+      if (accountType !== '' && account.accountType !== accountType) {
         return false;
       }
       if (needle.length === 0) {
@@ -44,144 +39,134 @@ export function AccountsPage(): ReactNode {
         account.email.toLowerCase().includes(needle)
       );
     });
-  }, [data, filters]);
+  }, [data, search, accountType]);
 
   const selected = rows.find((account) => account.id === selectedId) ?? null;
 
   return (
-    <section>
-      <header className="page__header">
-        <div>
-          <h1 className="page__title">Accounts</h1>
-          <p className="page__subtitle">
-            Identities that can sign in or act as a service, scoped to this tenant.
-          </p>
-        </div>
-      </header>
+    <section className="mx-auto max-w-6xl">
+      <PageHeader
+        title="Accounts"
+        description="Identities that can sign in or act as a service, scoped to this tenant."
+      />
 
-      <div className="toolbar">
-        <label className="toolbar__search">
-          <span className="field__label">Search</span>
-          <input
-            className="field__input"
+      {isError && (
+        <Notice tone="error">
+          {error instanceof Error ? error.message : 'Could not load accounts.'}
+        </Notice>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <Field label="Search" className="w-64">
+          <Input
             type="search"
             placeholder="Username, name, or email"
-            value={filters.search}
-            onChange={(event) =>
-              setFilters((previous) => ({ ...previous, search: event.target.value }))
-            }
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
           />
-        </label>
-        <label>
-          <span className="field__label">Type</span>
-          <select
-            className="field__input"
-            value={filters.accountType}
-            onChange={(event) =>
-              setFilters((previous) => ({ ...previous, accountType: event.target.value }))
-            }
-          >
-            <option value="">All</option>
+        </Field>
+        <Field label="Type" className="w-40">
+          <Select value={accountType} onChange={(event) => setAccountType(event.target.value)}>
+            <option value="">All types</option>
             {ACCOUNT_TYPES.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>
             ))}
-          </select>
-        </label>
-        <span className="toolbar__count">
-          {isPending
-            ? 'Loading...'
-            : `${rows.length} of ${data?.totalCount ?? 0}${isFetching ? ' (refreshing)' : ''}`}
-        </span>
+          </Select>
+        </Field>
+        <p className="ml-auto pb-2 text-xs text-ink-faint">
+          {isPending ? 'Loading...' : `${rows.length} of ${data?.totalCount ?? 0}`}
+          {isFetching && !isPending ? ' · refreshing' : ''}
+        </p>
       </div>
 
-      {isError && (
-        <div className="alert" role="alert">
-          {error instanceof Error ? error.message : 'Could not load accounts.'}
-        </div>
-      )}
-
-      <div className="table-wrap">
-        <table className="table">
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th scope="col">Username</th>
-              <th scope="col">Full name</th>
-              <th scope="col">Email</th>
-              <th scope="col">Type</th>
-              <th scope="col">Job title</th>
-              <th scope="col">Recorded</th>
+            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wider text-ink-faint">
+              <th className="px-4 py-2 font-medium">Username</th>
+              <th className="px-4 py-2 font-medium">Full name</th>
+              <th className="px-4 py-2 font-medium">Email</th>
+              <th className="px-4 py-2 font-medium">Type</th>
+              <th className="px-4 py-2 font-medium">Recorded</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((account) => (
               <tr
                 key={account.id}
-                className={account.id === selectedId ? 'table__row--selected' : undefined}
                 onClick={() => setSelectedId(account.id === selectedId ? null : account.id)}
+                className={cx(
+                  'cursor-pointer border-b border-line-subtle last:border-0',
+                  account.id === selectedId ? 'bg-accent/10' : 'hover:bg-surface-hover',
+                )}
               >
-                <td className="mono">{account.username}</td>
-                <td>{account.fullName.length > 0 ? account.fullName : <span className="tag">none</span>}</td>
-                <td>{account.email}</td>
-                <td>
-                  <span className={account.accountType === 'user' ? 'tag' : 'tag tag--system'}>
-                    {account.accountType}
-                  </span>
+                <td className="px-4 py-2 font-mono text-xs">{account.username}</td>
+                <td className="px-4 py-2">
+                  {account.fullName.length > 0 ? (
+                    account.fullName
+                  ) : (
+                    <span className="text-ink-faint">not recorded</span>
+                  )}
                 </td>
-                <td>{account.jobTitle.length > 0 ? account.jobTitle : ''}</td>
-                <td className="mono">{account.recordedAt}</td>
+                <td className="px-4 py-2 text-ink-muted">{account.email}</td>
+                <td className="px-4 py-2">
+                  <Tag tone={account.accountType === 'user' ? 'neutral' : 'accent'}>
+                    {account.accountType}
+                  </Tag>
+                </td>
+                <td className="px-4 py-2 font-mono text-xs text-ink-muted">{account.recordedAt}</td>
               </tr>
             ))}
           </tbody>
         </table>
         {!isPending && rows.length === 0 && (
-          <p className="table__empty">No accounts match the current filter.</p>
+          <p className="px-4 py-10 text-center text-sm text-ink-faint">
+            No accounts match the current filter.
+          </p>
         )}
       </div>
 
-      {selected !== null && <AccountDetail account={selected} />}
+      {selected !== null && <AccountDetail account={selected} onClose={() => setSelectedId(null)} />}
     </section>
   );
 }
 
-function AccountDetail({ account }: { readonly account: Account }): ReactNode {
-  return (
-    <aside className="detail-panel" aria-label={`Details for ${account.username}`}>
-      <dl className="detail-panel__grid">
-        <Field label="Account id" value={account.id} mono />
-        <Field label="Tenant id" value={account.tenantId} mono />
-        <Field label="Version" value={String(account.version)} />
-        <Field label="Account type" value={account.accountType} />
-        <Field label="Full name" value={account.fullName || 'not recorded'} />
-        <Field label="Email" value={account.email} />
-        <Field label="Job title" value={account.jobTitle || 'not recorded'} />
-        <Field label="Default party" value={account.defaultPartyId ?? 'not set'} mono />
-        <Field label="Reports to" value={account.reportsToAccountId ?? 'nobody'} mono />
-        <Field label="Recorded at" value={account.recordedAt} mono />
-        <Field label="Last change by" value={account.modifiedBy || 'unknown'} />
-        <Field label="Change reason" value={account.changeReasonCode || 'none'} />
-        <Field label="Commentary" value={account.changeCommentary || 'none'} />
-      </dl>
-    </aside>
-  );
-}
-
-function Field({
-  label,
-  value,
-  mono = false,
+function AccountDetail({
+  account,
+  onClose,
 }: {
-  readonly label: string;
-  readonly value: string;
-  readonly mono?: boolean;
+  readonly account: Account;
+  readonly onClose: () => void;
 }): ReactNode {
   return (
-    <div>
-      <dt className="detail-panel__term">{label}</dt>
-      <dd className={`detail-panel__value${mono ? ' mono' : ''}`} style={{ margin: 0 }}>
-        {value}
-      </dd>
-    </div>
+    <aside className="card mt-5 p-5" aria-label={`Details for ${account.username}`}>
+      <div className="mb-4 flex items-start justify-between">
+        <h2 className="text-sm font-semibold">{account.username}</h2>
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+      <dl className="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <Detail label="Account id" value={account.id} mono />
+        <Detail label="Tenant id" value={account.tenantId} mono />
+        <Detail label="Version" value={String(account.version)} />
+        <Detail label="Account type" value={account.accountType} />
+        <Detail label="Full name" value={account.fullName || 'not recorded'} />
+        <Detail label="Email" value={account.email} />
+        <Detail label="Job title" value={account.jobTitle || 'not recorded'} />
+        <Detail label="Default party" value={account.defaultPartyId ?? 'not set'} mono />
+        <Detail label="Reports to" value={account.reportsToAccountId ?? 'nobody'} mono />
+        <Detail label="Recorded at" value={account.recordedAt} mono />
+        <Detail label="Last change by" value={account.modifiedBy || 'unknown'} />
+        <Detail label="Change reason" value={account.changeReasonCode || 'none'} />
+      </dl>
+      {account.changeCommentary.length > 0 && (
+        <p className="mt-4 border-t border-line pt-4 text-sm text-ink-muted">
+          {account.changeCommentary}
+        </p>
+      )}
+    </aside>
   );
 }

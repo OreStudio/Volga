@@ -163,8 +163,11 @@ export interface ConnectionsStore {
   resolvePassword(id: ConnectionId, supplied?: string): string;
 
   listFolders(): readonly Folder[];
-  saveFolder(input: { readonly name: string; readonly description?: string; readonly parentId?: FolderId | null }, id?: FolderId): Folder;
-  deleteFolder(id: FolderId): void;
+  saveFolder(
+    input: { readonly name: string; readonly description?: string; readonly parentId?: string | null },
+    id?: string,
+  ): Folder;
+  deleteFolder(id: string): void;
 
   listTags(): readonly Tag[];
   ensureTag(name: string): Tag;
@@ -192,6 +195,12 @@ export function openConnectionsStore(options: OpenOptions = {}): ConnectionsStor
 function now(): string {
   return new Date().toISOString();
 }
+
+/**
+ * A folder key is either a uuid the store minted or a key from a snapshot, so
+ * it only has to be a non-empty token rather than a uuid.
+ */
+const FOLDER_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 /** Validates a port once, at the boundary, so nothing downstream has to. */
 function assertPort(value: number, label: string): number {
@@ -285,12 +294,15 @@ function createStore(
   }
 
   function saveFolder(
-    input: { readonly name: string; readonly description?: string; readonly parentId?: FolderId | null },
-    id?: FolderId,
+    input: { readonly name: string; readonly description?: string; readonly parentId?: string | null },
+    id?: string,
   ): Folder {
     const name = assertName(input.name, 'Folder name');
     const timestamp = now();
-    const folderIdValue = id ?? folderId(randomUUID());
+    const folderIdValue = id ?? randomUUID();
+    if (id !== undefined && !FOLDER_KEY_PATTERN.test(id)) {
+      throw new ConnectionsStoreError(`Not a usable folder key: ${JSON.stringify(id)}`);
+    }
 
     if (id === undefined) {
       database
@@ -307,10 +319,15 @@ function createStore(
         throw new NotFoundError('folder', folderIdValue);
       }
     }
-    return { id: folderIdValue, parentId: input.parentId ?? null, name, description: input.description ?? '' };
+    return {
+      id: folderIdValue,
+      parentId: input.parentId ?? null,
+      name,
+      description: input.description ?? '',
+    };
   }
 
-  function deleteFolder(id: FolderId): void {
+  function deleteFolder(id: string): void {
     database.prepare('DELETE FROM folders WHERE id = ?').run(id);
   }
 
@@ -672,10 +689,9 @@ function createStore(
 
 
 function mapFolder(row: Row): Folder {
-  const parent = readNullableString(row, 'parent_id');
   return {
-    id: folderId(readString(row, 'id')),
-    parentId: parent === null ? null : folderId(parent),
+    id: readString(row, 'id'),
+    parentId: readNullableString(row, 'parent_id'),
     name: readString(row, 'name'),
     description: readString(row, 'description'),
   };

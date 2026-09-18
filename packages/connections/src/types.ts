@@ -8,36 +8,45 @@
  * a half-populated mixture of the two.
  */
 
-declare const environmentIdBrand: unique symbol;
-declare const connectionIdBrand: unique symbol;
-declare const folderIdBrand: unique symbol;
-declare const tagIdBrand: unique symbol;
+/**
+ * Record keys.
+ *
+ * These are plain strings rather than branded types, and that is a deliberate
+ * change from the first version. The store mints a uuid when it creates a
+ * record, but it also reads records from a snapshot, which carries whatever
+ * keys that snapshot used. Branding them would mean either rejecting a foreign
+ * key or casting it, and a cast is exactly the false confidence the brand was
+ * meant to prevent. The store validates the shape of a key at its boundary
+ * instead.
+ */
+export type EnvironmentId = string;
+export type ConnectionId = string;
+export type FolderId = string;
+export type TagId = string;
 
-/** Identifies an environment. */
-export type EnvironmentId = string & { readonly [environmentIdBrand]: 'EnvironmentId' };
-/** Identifies a saved connection. */
-export type ConnectionId = string & { readonly [connectionIdBrand]: 'ConnectionId' };
-/** Identifies a folder. */
-export type FolderId = string & { readonly [folderIdBrand]: 'FolderId' };
-/** Identifies a tag. */
-export type TagId = string & { readonly [tagIdBrand]: 'TagId' };
+/**
+ * Keys the store mints are uuids; keys read from a snapshot need only be a
+ * usable token.
+ */
+const MINTED_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const KEY_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
-const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-function brandId<T>(value: string, label: string): T {
-  if (!ID_PATTERN.test(value)) {
-    throw new TypeError(`Not a canonical ${label}: ${JSON.stringify(value)}`);
+function assertMintedKey(value: string, label: string): string {
+  if (!MINTED_KEY_PATTERN.test(value)) {
+    throw new TypeError(`Not a ${label} key: ${JSON.stringify(value)}`);
   }
-  return value as T;
+  return value;
 }
 
-export const environmentId = (value: string): EnvironmentId => brandId(value, 'environment id');
-export const connectionId = (value: string): ConnectionId => brandId(value, 'connection id');
-export const folderId = (value: string): FolderId => brandId(value, 'folder id');
-export const tagId = (value: string): TagId => brandId(value, 'tag id');
+export const environmentId = (value: string): EnvironmentId =>
+  assertMintedKey(value, 'environment');
+export const connectionId = (value: string): ConnectionId => assertMintedKey(value, 'connection');
+export const folderId = (value: string): FolderId => assertMintedKey(value, 'folder');
+export const tagId = (value: string): TagId => assertMintedKey(value, 'tag');
 
-export function isEnvironmentId(value: string): value is EnvironmentId {
-  return ID_PATTERN.test(value);
+/** True for any key a store or a snapshot may legitimately use. */
+export function isUsableKey(value: string): boolean {
+  return KEY_PATTERN.test(value);
 }
 
 /**
@@ -105,7 +114,7 @@ export interface Connection {
 
 export interface Folder {
   readonly id: FolderId;
-  readonly parentId: FolderId | null;
+  readonly parentId: string | null;
   readonly name: string;
   readonly description: string;
 }

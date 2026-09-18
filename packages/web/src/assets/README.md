@@ -10,3 +10,8 @@ generic web page.
 
 Source of truth for these files is the C++ checkout. If the branding changes
 there, copy the new files across; do not edit them here.
+
+## landing-background.jpg
+
+The backdrop for the landing page. A trading floor, darkened in the layout so
+text sits on it legibly.

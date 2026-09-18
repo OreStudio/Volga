@@ -1,8 +1,8 @@
 /**
  * Drives the real browser against the running stack.
  *
- * This is the gate the unit tests cannot be: it proves the menu shell, the
- * connections screens, the sign-in screen, the session cookie and the accounts
+ * This is the gate the unit tests cannot be: it proves the landing page, the
+ * connection screens, the sign-in screen, the session cookie and the accounts
  * table all work together in a browser, and it captures screenshots as
  * evidence.
  *
@@ -41,22 +41,25 @@ async function screenshot(page: Page, name: string): Promise<void> {
 }
 
 /**
- * Opens a menu by its label and clicks one of its items.
+ * Follows a navigation link and waits for the screen it opens.
  *
- * The item is matched exactly, because a substring match would let "Import from
- * a file" satisfy a search for a shorter label.
+ * Waiting for the network is not enough: the route changes and React renders
+ * afterwards, so the heading is what confirms the screen is really there.
  */
-async function useMenu(page: Page, menu: string, item: string, expectedTitle: string): Promise<void> {
-  await page.click(`.menu__button:text-is("${menu}")`);
-  await page.waitForSelector('.menu__dropdown');
-  await page.click(`.menu__item-label:text-is("${item}")`);
-  // Waiting for the network is not enough: the route changes and React renders
-  // afterwards, so the heading is what confirms the screen is really there.
+async function goTo(page: Page, path: string, expectedTitle: string): Promise<void> {
+  // The sign-in link wraps a button, so it has no text of its own. Targeting the
+  // destination works for every link and is what the router uses anyway.
+  await page.click(`nav a[href="${path}"]`);
   await page.waitForSelector(`h1:text-is("${expectedTitle}")`, { timeout: 15_000 });
 }
 
-/** The chooser on the sign-in screen, which is not the only select on it. */
-const QUICK_CONNECT = 'label:has-text("Quick connect") select';
+/**
+ * The saved-connection chooser.
+ *
+ * Anchored to the field whose own label starts with "Connection", because the
+ * label filter beside it also contains that word.
+ */
+const CONNECTION_CHOOSER = 'label:has(> span:text-matches("^Connection")) select';
 
 async function main(): Promise<number> {
   const browser = await chromium
@@ -74,34 +77,28 @@ async function main(): Promise<number> {
     }
   });
 
-  console.log('\nmenus before sign-in:');
+  console.log('\nthe landing page:');
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
-  await page.waitForSelector('.menubar', { timeout: 15_000 });
-  check('the menu bar is present', await page.isVisible('.menubar'));
-  check('the Connections menu is offered', await page.isVisible('.menu__button:text-is("Connections")'));
-  check('the Login menu is offered', await page.isVisible('.menu__button:text-is("Login")'));
+  await page.waitForSelector('h1', { timeout: 15_000 });
+  check('the landing page is the entry point', await page.isVisible('h1:text-is("Trading operations, in the browser.")'));
+  check('the store path is shown', ((await page.textContent('body')) ?? '').includes('.db'));
   check('no session is open yet', (await context.cookies()).every((c) => c.name !== 'volga_session'));
+  await screenshot(page, '09-landing');
 
-  console.log('\nthe Connections menu:');
-  await page.click('.menu__button:text-is("Connections")');
-  await page.waitForSelector('.menu__dropdown');
-  check('the menu opens', await page.isVisible('.menu__dropdown'));
+  console.log('\nnavigation:');
+  for (const link of ['Connections', 'Import', 'Export']) {
+    check(`the ${link} link is offered`, await page.isVisible(`nav a:text-is("${link}")`));
+  }
+  // The link is an anchor wrapping a button, so its own text is empty. The
+  // accessible name is what a person and a screen reader go by.
   check(
-    'it offers to manage connections',
-    await page.isVisible('.menu__item-label:text-is("Manage connections")'),
+    'the sign in link is offered',
+    await page.isVisible('nav a[href="/login"]'),
+    await page.locator('nav a[href="/login"]').textContent() ?? '',
   );
-  check(
-    'it offers to import',
-    await page.isVisible('.menu__item-label:text-is("Import from a file")'),
-  );
-  check(
-    'it offers to export',
-    await page.isVisible('.menu__item-label:text-is("Export to a file")'),
-  );
-  await screenshot(page, '10-menu-open');
 
-  await page.click('.menu__item-label:text-is("Manage connections")');
-  await page.waitForLoadState('networkidle');
+  console.log('\nthe connections manager:');
+  await goTo(page, '/connections', 'Connections');
   await page.waitForSelector('table', { timeout: 15_000 });
   const manager = (await page.textContent('body')) ?? '';
   check('the manager shows the saved environment', manager.includes('festive_dijkstra'));
@@ -111,14 +108,17 @@ async function main(): Promise<number> {
   await screenshot(page, '11-connections-manager');
 
   console.log('\nthe Export screen:');
-  await useMenu(page, 'Connections', 'Export to a file', 'Export connections');
+  await goTo(page, '/connections/export', 'Export connections');
   const exporter = (await page.textContent('body')) ?? '';
   check('it explains the database copy', exporter.includes('Copy the database'));
-  check('it offers a copy without passwords', exporter.includes('without passwords'));
+  check(
+    'it offers a copy without passwords',
+    exporter.includes('Without passwords'),
+  );
   await screenshot(page, '12-export');
 
   console.log('\nthe Import screen:');
-  await useMenu(page, 'Connections', 'Import from a file', 'Import connections');
+  await goTo(page, '/connections/import', 'Import connections');
   const importer = (await page.textContent('body')) ?? '';
   check('it offers a file chooser', await page.isVisible('input[type="file"]'));
   check('it offers a dry run', importer.includes('Check first'));
@@ -129,23 +129,33 @@ async function main(): Promise<number> {
   );
   await screenshot(page, '13-import');
 
-  console.log('\nthe Login screen:');
-  await useMenu(page, 'Login', 'Sign in', 'Sign in');
+  console.log('\nthe sign in screen:');
+  await goTo(page, '/login', 'Sign in');
   await page.waitForSelector('input[name="username"]', { timeout: 15_000 });
-  check('the banner artwork is shown', await page.isVisible('.signin__banner'));
   check('the username field is present', await page.isVisible('input[name="username"]'));
-  check('the password field is masked', (await page.getAttribute('input[name="password"]', 'type')) === 'password');
-  check('a quick connect chooser is offered', await page.isVisible(QUICK_CONNECT));
-  check('the server field is present', await page.isVisible('.field__input[placeholder="localhost"]'));
+  check(
+    'the password field is masked',
+    (await page.getAttribute('input[name="password"]', 'type')) === 'password',
+  );
+  check('the splash banner is gone', (await page.isVisible('.signin__banner')) === false);
+  check('a connection chooser is offered', await page.isVisible(CONNECTION_CHOOSER));
+  check('the server is behind a disclosure', await page.isVisible('details'));
 
-  // The chooser is the point of the screen: picking a saved connection should
-  // fill in who to sign in as and where to connect.
-  const options = await page.locator(`${QUICK_CONNECT} option`).allTextContents();
+  // Show password is a toggle acting on the field rather than a checkbox.
+  await page.click('button:has-text("Show")');
+  check(
+    'show password reveals the field',
+    (await page.getAttribute('input[name="password"]', 'type')) === 'text',
+  );
+  await page.click('button:has-text("Hide")');
+
+  const options = await page.locator(`${CONNECTION_CHOOSER} option`).allTextContents();
   check(
     'the chooser offers the saved environment and connection',
     options.some((text) => text.includes('festive_dijkstra')),
     options.slice(1, 4).join(' | '),
   );
+  await screenshot(page, '14-login');
 
   console.log('\nrejected credentials:');
   await page.fill('input[name="username"]', USERNAME);
@@ -156,18 +166,18 @@ async function main(): Promise<number> {
   check('the server message is shown', alertText.length > 0, alertText);
   check('no session was established', (await context.cookies()).every((c) => c.name !== 'volga_session'));
 
-  console.log('\nquick connect fills the form:');
+  console.log('\nchoosing a saved connection fills the form:');
   // Clear the deliberate wrong password first, so what is asserted is that the
   // saved credential is used rather than anything typed.
   await page.fill('input[name="password"]', '');
   const connectionValue = await page
-    .locator(`${QUICK_CONNECT} option`)
+    .locator(`${CONNECTION_CHOOSER} option`)
     .evaluateAll((options) => {
       const match = options.find((option) => option.text.startsWith('festive_dijkstra: volga_probe'));
       return match?.value ?? '';
     });
   check('the saved connection has a choosable value', connectionValue.length > 0, connectionValue);
-  await page.selectOption(QUICK_CONNECT, connectionValue);
+  await page.selectOption(CONNECTION_CHOOSER, connectionValue);
   const filledUsername = await page.inputValue('input[name="username"]');
   check('the username is filled from the saved connection', filledUsername === USERNAME, filledUsername);
   check('a previously typed password is cleared', (await page.inputValue('input[name="password"]')) === '');
@@ -175,7 +185,9 @@ async function main(): Promise<number> {
 
   console.log('\nsigning in with the saved credential:');
   await page.click('button[type="submit"]');
-  await page.waitForSelector('table', { timeout: 25_000 });
+  // The table element mounts while the query is still in flight, so wait for a
+  // row rather than for the table.
+  await page.waitForSelector('tbody tr', { timeout: 25_000 });
   check('the accounts table rendered', await page.isVisible('table'));
   const cookie = (await context.cookies()).find((c) => c.name === 'volga_session');
   check('a session cookie was set', cookie !== undefined);
@@ -190,8 +202,8 @@ async function main(): Promise<number> {
 
   console.log('\nsigning out:');
   await page.click('button:has-text("Sign out")');
-  await page.waitForSelector('.menubar', { timeout: 15_000 });
-  check('the menus remain available', await page.isVisible('.menu__button:text-is("Connections")'));
+  await page.waitForSelector('nav a[href="/login"]', { timeout: 15_000 });
+  check('navigation remains available', await page.isVisible('nav a:text-is("Connections")'));
   const after = (await context.cookies()).find((c) => c.name === 'volga_session');
   check('the session cookie was cleared', after === undefined || after.value === '');
 

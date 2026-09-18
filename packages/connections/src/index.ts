@@ -46,9 +46,18 @@ export {
   connectionId,
   environmentId,
   folderId,
-  isEnvironmentId,
+  isUsableKey,
   tagId,
 } from './types.js';
+export {
+  LegacyStoreError,
+  decryptLegacySecret,
+  legacyToSnapshot,
+  readLegacyStore,
+  verifyLegacyPassword,
+} from './legacy.js';
+export type { LegacyConnection, LegacyStore } from './legacy.js';
+
 export type {
   Connection,
   ConnectionId,

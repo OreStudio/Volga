@@ -141,20 +141,48 @@ Two things move a store:
   and a subset selected. Passwords travel encrypted, so a snapshot is only as
   safe as the master password it was written with.
 
-### The pre-authentication menus
+### The interface
 
-The chrome and its menus are present before sign-in, because managing
-connections is how you get somewhere to sign in to.
+A landing page opens the application and shows the state of the store, with the
+navigation down the side. Navigation and the connection controls are present
+before sign-in, because managing connections is how you get somewhere to sign in
+to. Only the account screens need a session.
 
-- **Connections** opens the manager, and the import and export screens.
-- **Login** opens the sign-in screen, which follows the desktop client: a label
-  filter, a quick connect chooser grouped into Environments and Connections, an
-  optional unlock for stored credentials, and the server, port and namespace.
+`Connections` holds the manager, the import screen and the export screen.
+`Sign in` is a plain form: a username, a password, and the connection details
+behind a disclosure.
+
+**Nothing about saved connections appears until the store is unlocked.** That is
+the honest behaviour rather than a convenience: an encrypted password is useless
+without the master password, so a list of connections you cannot use would be
+decoration. Locked, the sign-in screen is an ordinary login form with one extra
+button offering to unlock. The store's own bar shows where the database is, how
+much is in it, and whether it is open.
 
 Reads never need the master password. Environments, names and usernames are not
-secret, and the sign-in screen has to show somewhere to connect before anyone
-has identified themselves. Only saved passwords are encrypted, and only writes
-and credential use need the store unlocked.
+secret. Only saved passwords are encrypted, and only writes and credential use
+need the store unlocked.
+
+The interface is Tailwind CSS, with the design tokens declared once as theme
+variables. The controls are a handful of primitives in `src/ui/`, so how a
+button or a field behaves is one edit rather than a search.
+
+### Migrating from the Qt client
+
+The Qt client's connections can be brought across once. The source is opened
+read-only and is never written to, and the passwords are re-encrypted under
+Volga's own master password and format.
+
+```sh
+npx tsx scripts/migrate-legacy-connections.ts \
+  --source-password '<the legacy master password>' \
+  --target-password '<a new master password>' \
+  --target .runtime/volga/connections.db
+```
+
+Add `--dry-run` to see what would be carried across without writing. Connections
+that name an environment the legacy file does not define are reported rather
+than dropped silently.
 
 ### Verifying the interface
 
@@ -165,7 +193,7 @@ npm run dev:web
 npx tsx scripts/verify-browser.ts
 ```
 
-The verifier drives a real browser through the menus, the manager, the import
-and export screens, a rejected credential, quick connect filling the form from
-a saved connection, sign-in, and sign-out, and captures screenshots under
-`.runtime/screenshots/`.
+The verifier drives a real browser through the landing page, the navigation, the
+manager, the import and export screens, the disclosure and password toggle on
+the sign-in screen, a rejected credential, a saved connection filling the form,
+sign-in, and sign-out, and captures screenshots under `.runtime/screenshots/`.

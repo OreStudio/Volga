@@ -1,42 +1,44 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { useConnectionsCatalog, useConnectionsMutations } from '../api/connections-queries.js';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useConnectionsCatalog } from '../api/connections-queries.js';
 import { useSession } from '../session/SessionProvider.js';
 import { ApiFailure } from '../api/transport.js';
-import banner from '../assets/ore-studio-banner.png';
+import { Button, Field, Input, Notice, Select, Tag } from '../ui/Primitives.js';
 import type { ConnectionView, EnvironmentView } from '@volga/contracts';
 import type { PartySummary } from '@volga/protocol/browser';
 
 /**
- * The sign-in screen.
+ * Signing in.
  *
- * The shape follows the desktop client, because the people using it already
- * know it: a label filter, a quick-connect chooser that fills the fields below
- * it, an optional unlock for stored credentials, and then the credential.
+ * A plain web form: a username, a password, and a submit button. The connection
+ * details are a fallback rather than the main event, so they sit behind a
+ * disclosure and only the address is shown, since that is the only part anyone
+ * changes by hand.
  *
- * The store is read before anyone signs in, which is what lets the chooser be
- * populated at all. Only stored passwords need unlocking.
+ * Everything about saved connections appears only once the store is unlocked.
+ * That is the honest behaviour rather than a convenience: an encrypted password
+ * is useless without the master password, so a list of connections that cannot
+ * be used would be decoration. Locked, this is an ordinary login form with one
+ * extra button offering to unlock.
  */
 
-/** What the chooser is currently set to. */
-type Selection =
-  | { readonly kind: 'none' }
-  | { readonly kind: 'environment'; readonly id: string }
-  | { readonly kind: 'connection'; readonly id: string };
+interface Selection {
+  readonly kind: 'manual' | 'environment' | 'connection';
+  readonly id?: string;
+}
 
 export function SignInPage(): ReactNode {
   const { signIn, chooseParty } = useSession();
-  const { catalog, isLoading } = useConnectionsCatalog();
-  const { unlock } = useConnectionsMutations();
+  const { catalog } = useConnectionsCatalog();
 
-  const [selection, setSelection] = useState<Selection>({ kind: 'none' });
+  const [selection, setSelection] = useState<Selection>({ kind: 'manual' });
   const [label, setLabel] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [masterPassword, setMasterPassword] = useState('');
+  const [reveal, setReveal] = useState(false);
   const [server, setServer] = useState('localhost');
   const [port, setPort] = useState(4222);
   const [subjectPrefix, setSubjectPrefix] = useState('');
+  const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingParties, setPendingParties] = useState<readonly PartySummary[] | null>(null);
@@ -55,13 +57,11 @@ export function SignInPage(): ReactNode {
     return [...found].sort();
   }, [environments, connections]);
 
-  const visibleEnvironments = useMemo(
-    () => environments.filter((item) => label === '' || item.tagNames.includes(label)),
-    [environments, label],
+  const visibleEnvironments = environments.filter(
+    (item) => label === '' || item.tagNames.includes(label),
   );
-  const visibleConnections = useMemo(
-    () => connections.filter((item) => label === '' || item.tagNames.includes(label)),
-    [connections, label],
+  const visibleConnections = connections.filter(
+    (item) => label === '' || item.tagNames.includes(label),
   );
 
   function applyEnvironment(environment: EnvironmentView): void {
@@ -71,11 +71,10 @@ export function SignInPage(): ReactNode {
   }
 
   function applyConnection(connection: ConnectionView): void {
-    // Picking a saved connection means "use what is stored". Anything typed
-    // earlier belongs to a different attempt and would otherwise be sent
-    // instead of the saved credential, which looks like the saved password
-    // being wrong.
+    // Choosing a saved connection means "use what is stored", so anything typed
+    // for a different attempt is dropped rather than sent in its place.
     setPassword('');
+    setError(null);
 
     const where = connection.environment;
     if (where.kind === 'environment') {
@@ -91,14 +90,12 @@ export function SignInPage(): ReactNode {
     setUsername(connection.username);
   }
 
-  /** The single chooser, grouped the way the desktop client groups it. */
   function handleChoice(value: string): void {
+    setError(null);
     if (value === '') {
-      setSelection({ kind: 'none' });
+      setSelection({ kind: 'manual' });
       return;
     }
-    // Switching away from a saved connection drops its stored credential.
-    setPassword('');
     const separator = value.indexOf(':');
     const kind = value.slice(0, separator);
     const id = value.slice(separator + 1);
@@ -111,45 +108,25 @@ export function SignInPage(): ReactNode {
       }
       return;
     }
-    if (kind === 'connection') {
-      const connection = connections.find((item) => item.id === id);
-      if (connection !== undefined) {
-        setSelection({ kind: 'connection', id });
-        applyConnection(connection);
-      }
+    const connection = connections.find((item) => item.id === id);
+    if (connection !== undefined) {
+      setSelection({ kind: 'connection', id });
+      applyConnection(connection);
     }
   }
 
-  const selectionValue = selection.kind === 'none' ? '' : `${selection.kind}:${selection.id}`;
-
+  const selectionValue = selection.kind === 'manual' ? '' : `${selection.kind}:${selection.id ?? ''}`;
   const chosenConnection =
     selection.kind === 'connection'
       ? connections.find((item) => item.id === selection.id)
       : undefined;
-  const needsUnlock = chosenConnection?.hasSavedPassword === true && !unlocked;
+  const usingSavedPassword = chosenConnection?.hasSavedPassword === true;
 
   const canSubmit =
     username.trim().length > 0 &&
     server.trim().length > 0 &&
     !busy &&
-    (password.length > 0 || (chosenConnection?.hasSavedPassword === true && unlocked));
-
-  useEffect(() => {
-    // A label that no longer exists would silently hide everything.
-    if (label !== '' && !labels.includes(label)) {
-      setLabel('');
-    }
-  }, [label, labels]);
-
-  async function handleUnlock(): Promise<void> {
-    setError(null);
-    try {
-      await unlock.mutateAsync(masterPassword);
-      setMasterPassword('');
-    } catch (cause) {
-      setError(cause instanceof ApiFailure ? cause.message : 'Could not unlock the store.');
-    }
-  }
+    (password.length > 0 || usingSavedPassword);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -162,7 +139,9 @@ export function SignInPage(): ReactNode {
           server: server.trim(),
           port,
           subjectPrefix: subjectPrefix.trim(),
-          ...(selection.kind === 'connection' ? { connectionId: selection.id } : {}),
+          ...(selection.kind === 'connection' && selection.id !== undefined
+            ? { connectionId: selection.id }
+            : {}),
         },
       );
       if (result.outcome === 'party-required') {
@@ -175,234 +154,186 @@ export function SignInPage(): ReactNode {
     }
   }
 
-  async function handleParty(partyId: string): Promise<void> {
-    if (pendingParties === null) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await chooseParty(partyId, pendingParties);
-    } catch (cause) {
-      setError(cause instanceof ApiFailure ? cause.message : 'Could not select that party.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (pendingParties !== null) {
     return (
-      <div className="signin">
-        <div className="signin__card">
-          <h1 className="visually-hidden">Sign in</h1>
-          <img className="signin__banner" src={banner} alt="ORE Studio" />
-          <p className="signin__tagline">Choose the party to work in.</p>
-          {error !== null && (
-            <div className="alert" role="alert">
-              {error}
-            </div>
-          )}
-          <ul className="party-list">
-            {pendingParties.map((party) => (
-              <li key={party.id}>
-                <button
-                  className="button button--ghost party-list__button"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void handleParty(party.id)}
-                >
-                  {party.name.length > 0 ? party.name : party.id}
-                  {party.partyCategory.length > 0 && (
-                    <span className="tag">{party.partyCategory}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="mx-auto max-w-sm pt-12">
+        <h1 className="text-lg font-semibold tracking-tight">Choose a party</h1>
+        <p className="mt-1 mb-5 text-sm text-ink-muted">
+          This account works in more than one party. Pick the one to open.
+        </p>
+        {error !== null && <Notice tone="error">{error}</Notice>}
+        <ul className="space-y-2">
+          {pendingParties.map((party) => (
+            <li key={party.id}>
+              <button
+                type="button"
+                disabled={busy}
+                className="card flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:border-line-strong hover:bg-surface-hover disabled:opacity-50"
+                onClick={() => {
+                  setBusy(true);
+                  setError(null);
+                  chooseParty(party.id, pendingParties)
+                    .catch((cause: unknown) =>
+                      setError(cause instanceof ApiFailure ? cause.message : 'That did not work.'),
+                    )
+                    .finally(() => setBusy(false));
+                }}
+              >
+                <span>{party.name.length > 0 ? party.name : party.id}</span>
+                {party.partyCategory.length > 0 && <Tag>{party.partyCategory}</Tag>}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
     );
   }
 
   return (
-    <div className="signin">
-      <form className="signin__card" onSubmit={(event) => void handleSubmit(event)}>
-        <h1 className="visually-hidden">Sign in</h1>
-        <img className="signin__banner" src={banner} alt="ORE Studio" />
-        <p className="signin__tagline">Sign in to continue.</p>
+    <div className="mx-auto max-w-sm pt-12">
+      <h1 className="text-lg font-semibold tracking-tight">Sign in</h1>
+      <p className="mt-1 mb-5 text-sm text-ink-muted">
+        {unlocked
+          ? 'Pick a saved connection, or enter the details yourself.'
+          : 'Enter your credentials. Unlock the store to use a saved connection.'}
+      </p>
 
-        {error !== null && (
-          <div className="alert" role="alert">
-            {error}
-          </div>
+      {error !== null && <Notice tone="error">{error}</Notice>}
+
+      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+        {unlocked && (environments.length > 0 || connections.length > 0) && (
+          <>
+            {labels.length > 0 && (
+              <Field label="Filter by label">
+                <Select value={label} onChange={(event) => setLabel(event.target.value)}>
+                  <option value="">All connections</option>
+                  {labels.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
+            <Field label="Connection">
+              <Select value={selectionValue} onChange={(event) => handleChoice(event.target.value)}>
+                <option value="">Enter details manually</option>
+                {visibleEnvironments.length > 0 && (
+                  <optgroup label="Environments">
+                    {visibleEnvironments.map((environment) => (
+                      <option key={environment.id} value={`environment:${environment.id}`}>
+                        {environment.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {visibleConnections.length > 0 && (
+                  <optgroup label="Saved connections">
+                    {visibleConnections.map((connection) => (
+                      <option key={connection.id} value={`connection:${connection.id}`}>
+                        {connection.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </Select>
+            </Field>
+          </>
         )}
 
-        <label className="field">
-          <span className="field__label">Username</span>
-          <input
-            className="field__input"
+        <Field label="Username">
+          <Input
             name="username"
             value={username}
+            autoComplete="username"
+            autoFocus
+            required
             onChange={(event) => {
               setUsername(event.target.value);
               setError(null);
             }}
-            placeholder="Enter your username"
-            autoComplete="username"
-            autoFocus
-            required
           />
-        </label>
+        </Field>
 
-        <label className="field">
-          <span className="field__label">Password</span>
-          <input
-            className="field__input"
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              setError(null);
-            }}
-            placeholder="Enter your password"
-            autoComplete="current-password"
-          />
-        </label>
-
-        <div className="options-row">
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={(event) => setShowPassword(event.target.checked)}
+        <Field
+          label="Password"
+          {...(usingSavedPassword && password.length === 0
+            ? { hint: 'The saved password will be used.' }
+            : {})}
+        >
+          <div className="relative">
+            <Input
+              name="password"
+              type={reveal ? 'text' : 'password'}
+              value={password}
+              autoComplete="current-password"
+              className="pr-16"
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError(null);
+              }}
             />
-            <span>Show password</span>
-          </label>
-        </div>
-
-        {isLoading && <p className="spinner">Loading environments...</p>}
-
-        {catalog !== undefined && environments.length === 0 && connections.length === 0 && (
-          <p className="signin__hint">
-            No environments are saved yet. Use the Connections menu to add one.
-          </p>
-        )}
-
-        {labels.length > 0 && (
-          <label className="field">
-            <span className="field__label">Label</span>
-            <select
-              className="field__input"
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
+            {/* A toggle rather than a checkbox, because it acts on this field
+                and belongs beside it. */}
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 px-3 text-xs text-ink-faint hover:text-ink"
+              aria-pressed={reveal}
+              onClick={() => setReveal((value) => !value)}
             >
-              <option value="">All</option>
-              {labels.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+              {reveal ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </Field>
 
-        {(environments.length > 0 || connections.length > 0) && (
-          <label className="field">
-            <span className="field__label">Quick connect</span>
-            <select
-              className="field__input"
-              value={selectionValue}
-              onChange={(event) => handleChoice(event.target.value)}
-            >
-              <option value="">— connect manually —</option>
-              {visibleEnvironments.length > 0 && (
-                <optgroup label="Environments">
-                  {visibleEnvironments.map((environment) => (
-                    <option key={environment.id} value={`environment:${environment.id}`}>
-                      {environment.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {visibleConnections.length > 0 && (
-                <optgroup label="Connections">
-                  {visibleConnections.map((connection) => (
-                    <option key={connection.id} value={`connection:${connection.id}`}>
-                      {connection.name}
-                      {connection.description.length > 0 ? ` — ${connection.description}` : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </label>
-        )}
-
-        {needsUnlock && (
-          <div className="unlock">
-            <span className="field__label">Master password</span>
-            <p className="signin__hint">
-              This connection has a saved password. Unlock the store to use it.
-            </p>
-            <div className="unlock__row">
-              <input
-                className="field__input"
-                type="password"
-                value={masterPassword}
-                onChange={(event) => setMasterPassword(event.target.value)}
-                placeholder="Master password"
-                autoComplete="off"
+        <details
+          open={advanced}
+          onToggle={(event) => setAdvanced((event.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer text-xs text-ink-faint hover:text-ink-muted">
+            Connection details
+          </summary>
+          <div className="mt-3 space-y-3">
+            <Field label="Server">
+              <Input
+                value={server}
+                required
+                onChange={(event) => setServer(event.target.value)}
               />
-              <button
-                className="button button--ghost"
-                type="button"
-                disabled={masterPassword.length === 0 || unlock.isPending}
-                onClick={() => void handleUnlock()}
-              >
-                {unlock.isPending ? 'Unlocking...' : 'Unlock'}
-              </button>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Port">
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={port}
+                  onChange={(event) => setPort(Number(event.target.value))}
+                />
+              </Field>
+              <Field label="Namespace">
+                <Input
+                  value={subjectPrefix}
+                  placeholder="ores.dev.local1"
+                  onChange={(event) => setSubjectPrefix(event.target.value)}
+                />
+              </Field>
             </div>
           </div>
-        )}
+        </details>
 
-        <label className="field">
-          <span className="field__label">Server</span>
-          <input
-            className="field__input"
-            value={server}
-            onChange={(event) => setServer(event.target.value)}
-            placeholder="localhost"
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span className="field__label">Port</span>
-          <input
-            className="field__input"
-            type="number"
-            min={1}
-            max={65535}
-            value={port}
-            onChange={(event) => setPort(Number(event.target.value))}
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span className="field__label">Namespace</span>
-          <input
-            className="field__input"
-            value={subjectPrefix}
-            onChange={(event) => setSubjectPrefix(event.target.value)}
-            placeholder="ores.dev.local1"
-          />
-        </label>
-
-        <button className="button button--primary" type="submit" disabled={!canSubmit}>
-          {busy ? 'Signing in...' : 'Login'}
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="w-full"
+          disabled={!canSubmit}
+          pending={busy}
+          pendingLabel="Signing in..."
+        >
+          Sign in
+        </Button>
       </form>
     </div>
   );
