@@ -140,6 +140,7 @@ export const en: SourceCatalogue = {
     previous: 'Previous',
     next: 'Next',
     last: 'Last',
+    new: 'New',
     provenance: 'Provenance',
     general: 'General',
     related: 'Related',

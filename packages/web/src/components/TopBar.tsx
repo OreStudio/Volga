@@ -207,21 +207,54 @@ interface Crumb {
 
 /** Where you are, from the route rather than from state. */
 function breadcrumbs(pathname: string, t: (key: string) => string): readonly Crumb[] {
-  const [componentId, entityPath] = pathname.split('/').filter(Boolean);
+  /*
+   * The crumbs follow the whole path, and everything but the last one is a link.
+   *
+   * Reading only the component and the entity meant that on a record the entity
+   * was the last crumb, and the last crumb is never a link — so the list a person
+   * had come from was unreachable from the page they were on. The only way back
+   * was the sidebar or the browser button, which is not a way back for somebody
+   * who does not already know where they were.
+   */
+  const parts = pathname.split('/').filter(Boolean);
+  const [componentId, entityPath, recordId, action] = parts;
   const component = findComponent(componentId);
   if (component === undefined) {
     return [];
   }
 
   const crumbs: Crumb[] = [{ label: t(component.titleKey), to: `/${component.path}` }];
-  if (entityPath !== undefined) {
-    const entity = component.entities.find((e) => e.path === entityPath);
-    crumbs.push({
-      label:
-        entity === undefined
-          ? humanise(entityPath)
-          : translatedOrHumanised(t, `entity.${entity.id}.title`, entity.id),
-    });
+  if (entityPath === undefined) {
+    return crumbs;
+  }
+
+  const entity = component.entities.find((candidate) => candidate.path === entityPath);
+  crumbs.push({
+    label:
+      entity === undefined
+        ? humanise(entityPath)
+        : translatedOrHumanised(t, `entity.${entity.id}.title`, entity.id),
+    to: `/${component.path}/${entityPath}`,
+  });
+
+  if (recordId === undefined) {
+    return crumbs;
+  }
+
+  // Creating has no record yet, so the last crumb is the act rather than a thing.
+  if (recordId === 'new') {
+    crumbs.push({ label: t('entity.new') });
+    return crumbs;
+  }
+
+  // The record is a page of its own, so it is reachable from its own history and
+  // from its edit form.
+  crumbs.push({ label: recordId, to: `/${component.path}/${entityPath}/${recordId}` });
+
+  if (action === 'edit') {
+    crumbs.push({ label: t('entity.edit') });
+  } else if (action === 'history') {
+    crumbs.push({ label: t('entity.history') });
   }
   return crumbs;
 }

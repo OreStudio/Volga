@@ -130,6 +130,7 @@ const fr: SourceCatalogue = {
     previous: 'Précédente',
     next: 'Suivante',
     last: 'Dernière',
+    new: 'Nouveau',
     provenance: 'Provenance',
     general: 'Général',
     related: 'Associé',

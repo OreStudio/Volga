@@ -162,6 +162,19 @@ try {
   );
   await shot(page, '72-country-detail');
 
+  /*
+   * Getting back has to be possible without the browser button.
+   *
+   * A person who follows a link into a record and cannot find the list again is
+   * a person who stops following links, and this is the screen where that
+   * happened: the entity was the last crumb and the last crumb was plain text.
+   */
+  console.log('\ngetting back to the list:');
+  await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Country/i }).first().click();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
+  check('a record leads back to the list', page.url().endsWith('/refdata/country'), page.url());
+
   console.log('\nthe history:\n');
   await page.goto(`${APP}refdata/country/AR/history`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
@@ -169,6 +182,16 @@ try {
   check('the history screen opens', history.length > 0);
   check('it names the record', history.includes('AR') || history.includes('country'));
   await shot(page, '73-country-history');
+
+  // And from the history, back to the record, and on to the list.
+  await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /^AR$/ }).first().click();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
+  check('the history leads back to the record', page.url().endsWith('/refdata/country/AR'), page.url());
+  await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Country/i }).first().click();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(500);
+  check('the record leads back to the list again', page.url().endsWith('/refdata/country'), page.url());
 
   console.log('\nthe three languages:');
   for (const [englishName, expected] of [

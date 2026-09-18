@@ -135,6 +135,7 @@ const pt: SourceCatalogue = {
     previous: 'Anterior',
     next: 'Seguinte',
     last: 'Última',
+    new: 'Novo',
     provenance: 'Proveniência',
     general: 'Geral',
     related: 'Relacionado',
