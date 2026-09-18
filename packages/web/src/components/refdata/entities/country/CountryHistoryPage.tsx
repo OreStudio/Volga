@@ -46,7 +46,15 @@ export function CountryHistoryPage(): ReactNode {
   return (
     <EntityHistoryPage
       meta={countryMeta}
-      title={`${t('country.singular')} ${String(id ?? '')}`}
+      /*
+       * The record's own name, as the detail screen uses.
+       *
+       * `country.singular` is deliberately lower case: it exists to sit inside a
+       * sentence, as in "Delete country?". Using it as a heading is how the title
+       * read "country AD" — a fragment of a sentence and an identifier, in the
+       * one place a person looks to see what they are looking at.
+       */
+      title={newest?.name ?? String(id ?? '')}
       versions={versions}
       loading={query.isPending}
       failed={query.isError}

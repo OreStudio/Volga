@@ -180,7 +180,14 @@ try {
   await page.waitForTimeout(1200);
   const history = (await page.textContent('body')) ?? '';
   check('the history screen opens', history.length > 0);
-  check('it names the record', history.includes('AR') || history.includes('country'));
+  /*
+   * Titled by the record, not by the entity's singular. The singular exists to
+   * sit inside a sentence and is deliberately lower case, so using it as a
+   * heading produced "country AR" — a fragment and an identifier where a person
+   * looks to see what they are looking at.
+   */
+  const historyTitle = ((await page.locator('h1').first().textContent()) ?? '').trim();
+  check('the history is titled by the record', historyTitle === 'Argentina', historyTitle);
   await shot(page, '73-country-history');
 
   // And from the history, back to the record, and on to the list. The record is
