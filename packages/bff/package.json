@@ -1,0 +1,24 @@
+{
+  "name": "@volga/bff",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Backend for frontend. Owns the mTLS NATS connection and exposes a typed HTTP surface to the browser.",
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --force",
+    "dev": "tsx watch --env-file=../../.env src/main.ts",
+    "start": "node --env-file=../../.env dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@volga/protocol": "*",
+    "fastify": "5.12.5"
+  },
+  "devDependencies": {
+    "tsx": "4.23.13",
+    "vitest": "5.0.1"
+  }
+}
