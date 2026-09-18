@@ -28,6 +28,9 @@ PASSWORD="${2:-Secure-Password-123}"
 TENANT_ID="${TENANT_ID:-ffffffff-ffff-ffff-ffff-ffffffffffff}"
 AUDIT_ACCOUNT="${AUDIT_ACCOUNT:-sysadmin}"
 CHANGE_REASON="${CHANGE_REASON:-system.test}"
+# The role that makes the account able to write. TenantAdmin has full access
+# within its tenant, which is what an account used for verification needs.
+ROLE="${ROLE:-TenantAdmin}"
 
 WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER="$WORKSPACE/.runtime/build/make-test-hash"
@@ -120,6 +123,26 @@ granted_parties as (
     on p.tenant_id = ia.tenant_id
    and p.valid_to = ores_utility_infinity_timestamp_fn()
    and p.status = 'Active'
+  returning 1
+),
+-- The service authorises every write against the account's roles, and an account
+-- with none can read but not write. That failure arrives as a server error the
+-- client cannot distinguish from an expired token, which is a long detour to
+-- take, so the role is granted here.
+granted_roles as (
+  insert into ores_iam_account_roles_tbl (
+    account_id, tenant_id, role_id, assigned_by, assigned_at,
+    change_reason_code, change_commentary, valid_from, valid_to
+  )
+  select
+    ia.id, ia.tenant_id, r.id, '${AUDIT_ACCOUNT}', now(),
+    '${CHANGE_REASON}', 'seeded by volga seed-test-account.sh',
+    now(), ores_utility_infinity_timestamp_fn()
+  from inserted_account ia
+  join ores_iam_roles_tbl r
+    on r.tenant_id = ia.tenant_id
+   and r.name = '${ROLE}'
+   and r.valid_to = ores_utility_infinity_timestamp_fn()
   returning 1
 ),
 -- The login handler refuses an account with no tracking row, and increments

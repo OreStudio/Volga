@@ -13,6 +13,9 @@ import {
   listCountriesRequestSchema,
   countryPageSchema,
   changeReasonPageSchema,
+  getImagesRequestSchema,
+  getImagesResponseSchema,
+  imageBytesToBuffer,
   countryHistoryRequestSchema,
   countryHistoryResponseSchema,
   saveCountryRequestSchema,
@@ -510,6 +513,39 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         displayOrder: reason.display_order,
       })),
     };
+  });
+
+  /**
+   * One image, by its identifier.
+   *
+   * Flags live in the assets service as ordinary images, so this is what a flag
+   * cell points at. Fetched through the BFF because the browser never reaches
+   * NATS, which is the same reason every other read goes through here.
+   *
+   * Cached hard, and safely: an image's identifier is its identity and its bytes
+   * never change, so a record that points at `abc` will always point at the same
+   * picture. That also means a page of twenty-five flags costs one request each
+   * the first time and none afterwards.
+   */
+  server.get('/api/images/:id', async (request, reply) => {
+    const session = requireSession(request);
+    const { id } = request.params as { id: string };
+
+    const response = await session.client.callAuthenticated(
+      SUBJECTS.getImages,
+      getImagesRequestSchema.parse({ image_ids: [id] }),
+      getImagesResponseSchema,
+    );
+
+    const image = response.images[0];
+    if (image === undefined) {
+      return reply.code(404).send();
+    }
+
+    return reply
+      .header('content-type', image.mime_type.length > 0 ? image.mime_type : 'image/svg+xml')
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .send(imageBytesToBuffer(image.data));
   });
 
   server.addHook('onClose', async () => {

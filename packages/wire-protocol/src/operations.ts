@@ -23,6 +23,7 @@ export const SUBJECTS = {
   deleteCountries: 'refdata.v1.countries.delete',
   countryHistory: 'refdata.v1.countries.history',
   listChangeReasons: 'dq.v1.change_reasons.list',
+  getImages: 'assets.v1.images.get',
   httpInfo: 'http-server.v1.info.get',
 } as const;
 

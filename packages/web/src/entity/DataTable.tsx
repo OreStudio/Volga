@@ -129,7 +129,11 @@ export function DataTable<Row extends Record<string, unknown>>({
               >
                 {visible.map((column) => (
                   <td key={column.name} className={cx('px-3 py-2', alignment(column.style))}>
-                    <Cell column={column} value={row[column.name]} />
+                    <Cell
+                      column={column}
+                      value={row[column.name]}
+                      {...(typeof row['image_id'] === 'string' ? { flagId: row['image_id'] } : {})}
+                    />
                   </td>
                 ))}
                 <td />
@@ -265,6 +269,31 @@ function RowMenu<Row>({
   );
 }
 
+/**
+ * A flag.
+ *
+ * Flags are not a separate concept: a country carries an image identifier and the
+ * image happens to be a flag. The bytes come through the BFF, since the browser
+ * never reaches NATS.
+ *
+ * A record with no image gets the same quiet placeholder as any other empty cell,
+ * so a missing flag reads as absent data rather than as a broken image.
+ */
+function Flag({ imageId }: { readonly imageId?: string | null }): ReactNode {
+  if (imageId === undefined || imageId === null || imageId.length === 0) {
+    return <span className="inline-block size-4 shrink-0" aria-hidden />;
+  }
+  return (
+    <img
+      src={`/api/images/${encodeURIComponent(imageId)}`}
+      alt=""
+      aria-hidden
+      loading="lazy"
+      className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover"
+    />
+  );
+}
+
 /** Horizontal alignment and font, from the declared style. */
 function alignment(style: ColumnStyle): string {
   switch (style) {
@@ -290,7 +319,15 @@ function isMono(style: ColumnStyle): boolean {
   return style.startsWith('mono');
 }
 
-function Cell({ column, value }: { readonly column: ColumnMeta; readonly value: unknown }): ReactNode {
+function Cell({
+  column,
+  value,
+  flagId,
+}: {
+  readonly column: ColumnMeta;
+  readonly value: unknown;
+  readonly flagId?: string | null;
+}): ReactNode {
   const text = value === null || value === undefined ? '' : String(value);
 
   if (text.length === 0) {
@@ -302,7 +339,7 @@ function Cell({ column, value }: { readonly column: ColumnMeta; readonly value: 
   if (column.flag === true) {
     return (
       <span className="flex items-center gap-2">
-        <MaskIcon name="flag" className="size-3.5 text-ink-faint" />
+        <Flag {...(flagId === undefined ? {} : { imageId: flagId })} />
         <span className={cx(isMono(column.style) && 'font-mono')}>{text}</span>
       </span>
     );
