@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from '../i18n/Provider.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Notice, cx } from '../ui/Primitives.js';
+import { diffValues, type Segment } from './diff.js';
 import type { ColumnMeta, EntityMeta } from '../generated/ui-contract.js';
 
 /**
@@ -52,23 +53,32 @@ export function EntityHistoryPage({
   const [showAll, setShowAll] = useState(false);
 
   /*
-   * One row per version.
+   * One row per history entry.
    *
-   * A version is the identity of a history entry, so two entries with the same
-   * version are the same entry appearing twice. The service can return that —
-   * duplicate rows for one version exist in this data — and rendering them twice
-   * shows a person a change that did not happen. Kept rather than hidden: if two
-   * differ, the first is the one shown, and the duplication itself is a data
-   * problem to fix at the source.
+   * The identity is a version and its content, and neither alone will do.
+   *
+   * Version alone collapses the generations: a record that was deleted and
+   * created again starts numbering at one, so version alone made an old
+   * comparison look like the current one.
+   *
+   * Version and time together keep the duplicates the service returns — the same
+   * version written twice with different timestamps, which is a data problem to
+   * fix at the source — so the screen compared a row with itself and reported no
+   * changes for a record that had changed.
+   *
+   * Version and content is right: two entries with the same version and the same
+   * values are one entry, whoever wrote them and whenever, and two entries with
+   * the same version and different values are different entries.
    */
   const entries = useMemo(() => {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     return versions.filter((version) => {
-      if (seen.has(version.version)) return false;
-      seen.add(version.version);
+      const key = entryKey(version, meta.columns);
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-  }, [versions]);
+  }, [versions, meta.columns]);
 
   const older = entries[selected + 1];
   const newer = entries[selected];
@@ -109,7 +119,10 @@ export function EntityHistoryPage({
             <h2 className="mb-2 text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
             <ol className="space-y-1.5">
               {entries.map((version, index) => (
-                <li key={version.version}>
+                // Keyed by the same identity the deduplication uses: a version
+                // alone can legitimately appear twice, once per life of the
+                // record after a delete and a re-create.
+                <li key={entryKey(version, meta.columns)}>
                   <button
                     type="button"
                     onClick={() => setSelected(index)}
@@ -195,11 +208,24 @@ export function EntityHistoryPage({
                     {shown.map((row) => (
                       <tr key={row.name} className="border-b border-line/60 last:border-0">
                         <td className="px-3 py-2 text-ink-muted">{t(row.headerKey)}</td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          <Value present={row.changed}>{row.before}</Value>
+                        {/* The cell carries a wash and the run carries the mark,
+                            so a scan finds the field and reading finds the
+                            characters. */}
+                        <td
+                          className={cx(
+                            'px-3 py-2 font-mono text-xs',
+                            row.changed && 'bg-red-500/[0.06]',
+                          )}
+                        >
+                          <Value segments={row.before} side="before" />
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          <Value present={row.changed}>{row.after}</Value>
+                        <td
+                          className={cx(
+                            'px-3 py-2 font-mono text-xs',
+                            row.changed && 'bg-emerald-500/[0.06]',
+                          )}
+                        >
+                          <Value segments={row.after} side="after" />
                         </td>
                       </tr>
                     ))}
@@ -225,21 +251,82 @@ export function EntityHistoryPage({
   );
 }
 
-function Value({ present, children }: { readonly present: boolean; readonly children: string }): ReactNode {
-  if (children.length === 0) {
+/**
+ * A value, with the part that differs marked.
+ *
+ * Red on the side it left and green on the side it arrived, which is the
+ * convention a person already reads in a code host, and the reason the changed
+ * characters are found rather than the whole value being coloured: marking the
+ * whole cell says "something here is different", and marking the run says what.
+ *
+ * The runs are the only place colour carries meaning here, so the two are the
+ * same green and red used for success and failure elsewhere, and nothing else on
+ * the screen uses them.
+ */
+function Value({
+  segments,
+  side,
+}: {
+  readonly segments: readonly Segment[];
+  readonly side: 'before' | 'after';
+}): ReactNode {
+  if (segments.length === 0) {
     // A blank is said rather than shown, so it is not mistaken for a failure.
     return <span className="text-ink-faint">—</span>;
   }
-  // A changed value is marked, so a scan finds it without reading every row.
-  return present ? <span className="text-ink">{children}</span> : <span className="text-ink-muted">{children}</span>;
+  return (
+    <span>
+      {segments.map((segment, index) =>
+        segment.changed ? (
+          <mark
+            key={index}
+            className={
+              side === 'before'
+                ? 'rounded-sm bg-red-500/20 px-0.5 text-red-200'
+                : 'rounded-sm bg-emerald-500/20 px-0.5 text-emerald-200'
+            }
+          >
+            {segment.text}
+          </mark>
+        ) : (
+          <span key={index} className="text-ink-muted">
+            {segment.text}
+          </span>
+        ),
+      )}
+    </span>
+  );
 }
 
 interface DiffRow {
   readonly name: string;
   readonly headerKey: string;
-  readonly before: string;
-  readonly after: string;
+  /** The value split into what changed and what did not, per side. */
+  readonly before: readonly Segment[];
+  readonly after: readonly Segment[];
   readonly changed: boolean;
+}
+
+/**
+ * The columns a comparison is about.
+ *
+ * The identity, the actor and the time are excluded: one cannot change, and the
+ * others differ by definition, so including them would show a change on every
+ * row of every comparison and hide the ones that matter.
+ */
+function comparedColumns(columns: readonly ColumnMeta[]): readonly ColumnMeta[] {
+  return columns.filter(
+    (column) =>
+      column.name !== 'version' &&
+      column.name !== 'modified_by' &&
+      column.name !== 'recorded_at',
+  );
+}
+
+/** What makes two history entries the same entry. */
+function entryKey(version: HistoryVersion, columns: readonly ColumnMeta[]): string {
+  const values = comparedColumns(columns).map((column) => text(version.values[column.name]));
+  return `${version.version}\u0000${values.join('\u0000')}`;
 }
 
 /** Compares two versions across the entity's own columns. */
@@ -248,19 +335,17 @@ function diff(
   newer: HistoryVersion,
   columns: readonly ColumnMeta[],
 ): readonly DiffRow[] {
-  return columns
-    // The identity and the version are not changes worth listing: one cannot
-    // change and the other changes by definition.
-    .filter((column) => column.name !== 'version' && column.name !== 'modified_by' && column.name !== 'recorded_at')
+  return comparedColumns(columns)
     .map((column) => {
       const before = text(older.values[column.name]);
       const after = text(newer.values[column.name]);
+      const diff = diffValues(before, after);
       return {
         name: column.name,
         headerKey: column.headerKey,
-        before,
-        after,
-        changed: before !== after,
+        before: diff.before,
+        after: diff.after,
+        changed: !diff.equal,
       };
     });
 }

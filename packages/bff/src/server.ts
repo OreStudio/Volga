@@ -495,8 +495,14 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       countryHistoryRequestSchema.parse({ alpha2_code: code }),
       countryHistoryResponseSchema,
     );
+    /*
+     * The service returns newest first and that is what a person wants: what
+     * changed last is the question being asked. It is passed through rather than
+     * reordered, because reversing it here quietly made the screen compare the
+     * two oldest versions as though they were the current pair.
+     */
     return {
-      versions: response.history.map(mapCountry).reverse(),
+      versions: response.history.map(mapCountry),
       message: response.message,
     };
   });
