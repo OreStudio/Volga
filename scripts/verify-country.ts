@@ -141,10 +141,25 @@ try {
   const alpha2 = await page.locator('input#alpha2_code').inputValue();
   check('the form is filled in, not showing placeholders', alpha2.length > 0, `alpha2="${alpha2}"`);
 
+  /*
+   * Provenance is asserted on its labels and its values rather than on a
+   * particular reason code. The reasons are data, so a check that depends on one
+   * of them tests the seed rather than the screen.
+   */
   await page.locator('button[role="tab"]', { hasText: /Provenance/i }).click();
-  await page.waitForTimeout(300);
-  const provenance = (await page.textContent('body')) ?? '';
-  check('provenance shows the record\u2019s audit fields', /v|1/.test(provenance) && provenance.includes('system.'));
+  await page.locator('dt').first().waitFor({ timeout: 10_000 });
+  const labels = await page.locator('dt').allTextContents();
+  const values = await page.locator('dd').allTextContents();
+  check(
+    'provenance lists the audit fields',
+    labels.some((l) => /version/i.test(l)) && labels.some((l) => /modified by/i.test(l)),
+    labels.join(' / ').slice(0, 80),
+  );
+  check(
+    'provenance has values rather than blanks',
+    values.some((v) => v.trim().length > 0 && !/not recorded/i.test(v)),
+    values.join(' / ').slice(0, 80),
+  );
   await shot(page, '72-country-detail');
 
   console.log('\nthe history:\n');
@@ -185,12 +200,18 @@ try {
     await page.locator('button', { hasText: /^Save$/ }).first().click();
     await page.waitForTimeout(800);
 
-    // The audit prompt, and the commit button whose label follows the operation.
-    const reasons = page.locator('[role="listbox"] button[role="option"]');
-    check('saving prompts for a reason', (await reasons.count()) > 0, `${await reasons.count()} reasons`);
+    /*
+     * The audit prompt. The reason is a combo, and the commit uses whatever it
+     * defaulted to, which is the point: a default that has to be chosen anyway
+     * is not a default.
+     */
+    const reasonCombo = page.locator('[role="dialog"] select');
+    const optionCount = await reasonCombo.locator('option').count();
+    check('saving prompts for a reason', optionCount > 0, `${optionCount} reasons`);
+    const defaulted = await reasonCombo.inputValue();
+    check('the reason has a default', defaulted.length > 0, defaulted);
     await shot(page, '75-country-create-reason');
 
-    await reasons.first().click();
     await page.locator('[role="dialog"] button', { hasText: /^Create$/ }).click();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(800);
@@ -206,9 +227,8 @@ try {
     await page.fill('input#name', 'Verification Land amended');
     await page.locator('button', { hasText: /^Save$/ }).first().click();
     await page.waitForTimeout(800);
-    const amendReasons = page.locator('[role="listbox"] button[role="option"]');
-    check('amending prompts for a reason', (await amendReasons.count()) > 0);
-    await amendReasons.first().click();
+    const amendReasons = page.locator('[role="dialog"] select');
+    check('amending prompts for a reason', (await amendReasons.locator('option').count()) > 0);
     await page.locator('[role="dialog"] button', { hasText: /^Save$/ }).click();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(800);
@@ -234,10 +254,13 @@ try {
     await page.locator('[role="dialog"] button', { hasText: /^Delete$/ }).click();
     await page.waitForTimeout(1200);
     await shot(page, '78-delete-reason');
-    const deleteReasons = page.locator('[role="listbox"] button[role="option"]');
+    const deleteReasons = page.locator('[role="dialog"] select');
     const dialogLabel = await page.locator('[role="dialog"]').first().getAttribute('aria-label').catch(() => null);
-    check('deleting prompts for a reason', (await deleteReasons.count()) > 0, `dialog="${dialogLabel}"`);
-    await deleteReasons.first().click();
+    check(
+      'deleting prompts for a reason',
+      (await deleteReasons.locator('option').count()) > 0,
+      `dialog="${dialogLabel}"`,
+    );
     await page.locator('[role="dialog"] button', { hasText: /^Confirm Delete$/ }).click();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(800);

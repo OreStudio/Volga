@@ -71,22 +71,44 @@ export function reasonsFor(
         ? (r: ChangeReason) => r.appliesToAmend
         : (r: ChangeReason) => r.appliesToDelete;
 
-  return reasons
-    .filter(applies)
-    .filter((reason) => {
-      /*
-       * The diff decides which reasons apply to an amendment, and only to an
-       * amendment.
-       *
-       * "Nothing material changed" is a statement about an edit, so it is not a
-       * reason to delete anything, and the service does not offer it for a
-       * delete. Applying the rule to a delete therefore offered *no* reasons at
-       * all, and the dialog rendered empty. A create is unaffected for the same
-       * reason: nothing has changed yet.
-       */
-      if (operation !== 'amend') return true;
-      const isNonMaterial = reason.code === NON_MATERIAL_REASON;
-      return hasChanges ? !isNonMaterial : isNonMaterial;
-    })
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const applicable = reasons.filter(applies).sort(byDisplayOrder);
+
+  /*
+   * The diff decides which reasons apply to an amendment, and only to an
+   * amendment.
+   *
+   * "Nothing material changed" is a statement about an edit, so it is not a
+   * reason to delete anything, and a create is unaffected for the same reason:
+   * nothing has changed yet. Applying the rule to a delete once offered *no*
+   * reasons at all and the dialog rendered empty.
+   */
+  if (operation !== 'amend') return applicable;
+
+  const isNonMaterial = (reason: ChangeReason): boolean =>
+    reason.code === NON_MATERIAL_REASON;
+  const matching = applicable.filter((reason) =>
+    hasChanges ? !isNonMaterial(reason) : isNonMaterial(reason),
+  );
+
+  /*
+   * A filter that matches nothing offers everything rather than nothing.
+   *
+   * The reasons are data, and this deployment has no non-material reason at all:
+   * the code the rule is built on is absent. Filtering to it therefore left an
+   * amendment with an empty dialog and no way to save — the same failure the
+   * delete path had, arriving by a different route. An empty selector is never
+   * the right answer; the reason set the server offers is.
+   */
+  return matching.length > 0 ? matching : applicable;
+}
+
+/**
+ * By display order, which is the field that means it.
+ *
+ * The order is deliberate: the reasons people reach for most sit first, and the
+ * catch-alls carry a sentinel order of 1000 so they sink to the bottom without
+ * the author having to number everything between them.
+ */
+function byDisplayOrder(a: ChangeReason, b: ChangeReason): number {
+  return a.displayOrder - b.displayOrder;
 }

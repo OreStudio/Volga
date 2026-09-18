@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from '../i18n/Provider.js';
-import { Button, Dialog, Notice, cx } from '../ui/Primitives.js';
+import { Button, Dialog, Notice } from '../ui/Primitives.js';
 import {
-  NON_MATERIAL_REASON,
   reasonsFor,
   type ChangeReason,
   type WriteOperation,
@@ -44,6 +43,13 @@ export function ChangeReasonDialog({
   const { t } = useTranslation();
   const offered = reasonsFor(reasons, operation, hasChanges);
 
+  /*
+   * The default is the first reason in the server's order.
+   *
+   * `display_order` is authored for exactly this: the reasons people reach for
+   * most sit first, and the catch-alls carry a sentinel of 1000 so they sink.
+   * So the first is the intended default and there is nothing to guess.
+   */
   const [selected, setSelected] = useState<string>(() => offered[0]?.code ?? '');
   const [commentary, setCommentary] = useState('');
 
@@ -83,43 +89,45 @@ export function ChangeReasonDialog({
         <Notice tone="error">{t('audit.noReasons')}</Notice>
       ) : (
         <>
-          <ul className="mb-4 space-y-1.5" role="listbox" aria-label={t('audit.reason')}>
-            {offered.map((option) => (
-              <li key={option.code}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={option.code === selected}
-                  onClick={() => setSelected(option.code)}
-                  className={cx(
-                    'w-full rounded-md border px-3 py-2 text-left transition-colors',
-                    option.code === selected
-                      ? 'border-accent bg-surface-overlay'
-                      : 'border-line hover:border-line-strong',
-                    // The one reason that means "nothing changed" is marked,
-                    // because it is the one most easily chosen by mistake.
-                    option.code === NON_MATERIAL_REASON && 'border-dashed',
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-sm text-ink">{option.code}</span>
-                    {option.code === NON_MATERIAL_REASON && (
-                      <span className="rounded-full border border-line px-1.5 py-px text-[10px] uppercase tracking-wide text-ink-faint">
-                        {t('audit.nonMaterial')}
-                      </span>
-                    )}
-                  </span>
-                  {option.description.length > 0 && (
-                    <span className="mt-0.5 block text-xs italic text-ink-muted">
-                      {option.description}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-
+          {/*
+            A combo, not a list of buttons.
+            
+            There are twenty-odd reasons for an amendment and the list grows, so a
+            wall of buttons is a wall to read before every write. A combo shows
+            one at a time and lets the browser's own keyboard handling do the
+            finding, which is what it is good at.
+          */}
           <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">
+              {t('audit.reason')}
+            </span>
+            <select
+              value={selected}
+              onChange={(event) => setSelected(event.target.value)}
+              autoFocus
+              className="h-9 w-full rounded-md border border-line bg-bg-secondary px-2.5 text-sm text-ink focus:border-line-strong focus:outline-none"
+            >
+              {offered.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.description.length > 0 ? option.description : option.code}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/*
+            The code and the description below the control, because the combo
+            shows one of them and the audit trail records the other. Seeing both
+            is what stops a person recording a reason they did not mean.
+          */}
+          {reason !== undefined && (
+            <p className="mt-1.5 text-xs text-ink-faint">
+              <span className="font-mono">{reason.code}</span>
+              {reason.description.length > 0 && ` — ${reason.description}`}
+            </p>
+          )}
+
+          <label className="mt-4 block">
             <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
               {t('audit.commentary')}
               {commentaryRequired && <span className="text-ink-faint">*</span>}
