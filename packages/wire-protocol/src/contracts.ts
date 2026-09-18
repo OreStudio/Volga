@@ -59,9 +59,24 @@ export const loginResultSchema = z.discriminatedUnion('outcome', [
 ]);
 export type LoginResult = z.infer<typeof loginResultSchema>;
 
+/**
+ * Where to connect, and who to connect as.
+ *
+ * The endpoint comes from the connections store rather than from this server's
+ * configuration, because a person chooses an environment on the sign-in screen.
+ * The password is omitted when a saved connection is used, in which case the
+ * server resolves the stored credential and the browser never handles it.
+ */
 export const loginRequestSchema = z.object({
   username: z.string().min(1),
-  password: z.string().min(1),
+  password: z.string().default(''),
+  /** The NATS server to sign in to. */
+  server: z.string().min(1),
+  port: z.int().min(1).max(65535),
+  /** The subject namespace, which isolates one environment on a shared broker. */
+  subjectPrefix: z.string().default(''),
+  /** The saved connection being used, when one was chosen. */
+  connectionId: z.string().default(''),
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 

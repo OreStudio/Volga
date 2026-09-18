@@ -1,0 +1,139 @@
+:PROPERTIES:
+:ID: 7F1B2C44-9A3E-4D58-B6E1-2C7A5D9E4F80
+:END:
+#+title: The connections store is Volga's own, not a mirror of the Qt client's
+#+description: Why Volga owns a per-user connections database, where it lives, how it is encrypted, and how a person moves it between machines.
+#+type: decision
+#+level: cross
+#+filetags: :decision:connections:storage:
+#+created: 2026-09-18
+#+updated: 2026-09-18
+
+* Status
+
+Implemented. `@volga/connections`, 66 tests.
+
+* Context
+
+The Qt client kept a SQLite file holding the environments a person can connect
+to and the credentials saved for them. It lived at
+=~/.local/share/ores.qt/connections.db= and was unlocked by a master password
+held in memory.
+
+Volga needs the same capability, and it has to work before anyone has signed
+in: choosing where to connect precedes identifying yourself. The Qt client is
+being decommissioned, so the requirement is to port the capability, not to
+mirror the file.
+
+* Decision
+
+Volga owns a connections store, in its own location, under its own encryption,
+with a clean schema. There is no interoperability requirement with the Qt
+file.
+
+**Location.** =$XDG_CONFIG_HOME/volga/connections.db=, which is
+=~/.config/volga/connections.db= by default, overridable through
+=VOLGA_DATA_DIR= or =VOLGA_CONNECTIONS_DB=.
+
+The XDG base directory is the desktop convention for per-user configuration,
+which is what this is, and it makes the answer to "where is my data" a
+documented path. That matters because the store belongs to the person using it:
+they back it up, they carry it to another machine, and in the browser there is
+no other way for them to reach it. The store exposes its own location through
+=resolveStoreLocation=, including which setting chose it, so the interface shows
+where the file is rather than hiding it behind a session.
+
+**Schema.** The Qt schema was the starting point and was changed where it
+permitted illegal states.
+
+A connection's endpoint is now a choice the database enforces. It either
+references an environment or states its own host and port, and a =CHECK=
+constraint rejects a row that is half one and half the other. The Qt schema
+allowed =environment_id= and stray =host=/=port= columns to be populated at
+once and relied on application code to decide which won.
+
+Tags attach through one =taggings= table keyed by =(owner_kind, owner_id)=
+rather than a junction table per taggable kind, so a new taggable thing costs
+no migration.
+
+Folders, labels, descriptions and recent parties are all retained. The label
+filter on the sign-in screen depends on labels, and the pre-authentication
+management screens depend on folders.
+
+**Encryption.** scrypt with =N=2^15= and =r=8= derives a 32-byte key, and
+AES-256-GCM encrypts each saved password, in a versioned self-describing record.
+GCM is authenticated, so a wrong master password fails the tag check rather than
+returning plausible garbage, and a single flipped bit is a hard failure.
+
+The master password is verified against a verifier record rather than a
+password hash. It is the same primitive, it needs no second algorithm, and it
+answers "does this password open the store" in one constant-time comparison.
+
+A saved password is the only secret in the store. Environment names, hosts and
+usernames are readable without unlocking, because the sign-in screen has to show
+somewhere to connect before anyone has identified themselves.
+
+* Moving a store between machines
+
+Two operations, because they answer different needs.
+
+**Copying the file** is the exact move, and the one most people want. The file
+is the store. A checkpoint folds the write-ahead log into the main file first,
+so the single copy is complete and the =-wal= and =-shm= companions are not
+needed. =exportStoreBytes= hands the bytes to the browser.
+
+Crucially, the *browser* writes those bytes, not the server. The browser owns
+the file picker, so the destination is whatever directory the person chooses,
+typically something under their home directory such as =~/Documents=. The
+process serving the application never writes to a path the person did not pick
+through a picker, which removes an entire class of problem and matches how a
+person expects a download to behave.
+
+**Importing a file** runs the same idea in reverse. The browser reads a file the
+person chose and posts the bytes; the server writes them to a private temporary
+directory to open them, imports, and removes the temporary file whichever way it
+ends. The incoming file is never modified.
+
+**A snapshot** carries the contents rather than the file, so a store can be
+merged into one that already holds data, name clashes can be resolved, and a
+subset can be selected. It is JSON, so a person can read it, diff it and keep
+it in version control. `buildSnapshot`, `serialiseSnapshot`, `parseSnapshot`
+and `importSnapshot` do this.
+
+The ordering of a snapshot is normalised and the timestamp is injectable, so
+the same store produces the same bytes and a diff shows real changes only.
+
+Snapshots carry passwords encrypted, never in the clear. A snapshot is
+therefore exactly as safe as the master password it was written with, and a
+recipient who does not know that password gets the structure and the usernames
+and nothing they can sign in with. Passwords are re-encrypted under the
+destination's master password on import, so the two stores need not share one.
+
+Import resolves name clashes by name, because a name is the identity a person
+sees, and reports what it skipped, renamed and replaced rather than acting
+silently. Everything runs in one transaction.
+
+One hazard is worth naming. When a record is renamed to avoid a clash, any
+connection that referenced it must be repointed at the copy rather than the
+original. That is asserted directly, because getting it wrong attaches a
+connection to the wrong environment and looks fine.
+
+* Consequences
+
+Volga no longer depends on any part of the C++ checkout for its configuration.
+Nothing is read from =~/.local/share/ores.qt/=, and the C++ services are not
+started by Volga.
+
+There is no migration path from the Qt store yet. If it is wanted, it is a
+read-only adapter that decrypts with the Qt parameters and writes through the
+existing import path. It is deliberately not built, because the requirement is
+to port the capability rather than to preserve the old file.
+
+* A finding from the existing store
+
+Decrypting a row from the Qt file with =Secure-Password-123= returns
+=Secure-Password-123=. One secret serves as both the master password for the
+store and the saved NATS password for every client in it. On a development
+machine that is not an exposure, but rotating either one breaks the other. The
+new store does not require that, because the two passwords are independent by
+construction.

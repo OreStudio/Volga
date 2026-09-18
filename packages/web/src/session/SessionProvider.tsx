@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, ApiFailure } from '../api/client.js';
+import { api, type LoginEndpoint } from '../api/client.js';
+import { ApiFailure } from '../api/transport.js';
 import type { PartySummary, SessionView } from '@volga/protocol/browser';
 
 /**
@@ -34,7 +35,10 @@ export type SignInOutcome =
 
 interface SessionContextValue {
   readonly state: SessionState;
-  readonly signIn: (credentials: { username: string; password: string }) => Promise<SignInOutcome>;
+  readonly signIn: (
+    credentials: { username: string; password: string },
+    endpoint: LoginEndpoint,
+  ) => Promise<SignInOutcome>;
   readonly chooseParty: (partyId: string, parties: readonly PartySummary[]) => Promise<void>;
   readonly signOut: () => Promise<void>;
 }
@@ -105,14 +109,14 @@ export function SessionProvider({ children }: { readonly children: ReactNode }):
   }, [data, isError, isPending, error]);
 
   const signIn = useCallback<SessionContextValue['signIn']>(
-    async (credentials) => {
-      const result = await api.login(credentials);
+    async (credentials, endpoint) => {
+      const result = await api.login(credentials, endpoint);
       if (result.outcome === 'active') {
         queryClient.setQueryData(SESSION_QUERY_KEY, result.session);
         setState({ status: 'authenticated', session: result.session });
         return { outcome: 'active' };
       }
-      // A pending selection is not a session yet, so nothing is cached; the
+      // A pending selection is not a session yet, so nothing is cached. The
       // sign-in screen renders the picker from this return value.
       return { outcome: 'party-required', parties: result.availableParties };
     },

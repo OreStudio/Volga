@@ -19,7 +19,20 @@ import {
 import type { Config } from './config.js';
 import { createRateLimiter, type RateLimiter } from './rate-limit.js';
 import { createSessionStore, type LiveSession, type SessionStore } from './sessions.js';
-import { invalidCredentials, invalidRequest, notAuthenticated, toHttpFailure } from './errors.js';
+import {
+  HttpFailure,
+  invalidCredentials,
+  invalidRequest,
+  notAuthenticated,
+  toHttpFailure,
+} from './errors.js';
+import { connectionId as asConnectionId } from '@volga/connections';
+import {
+  asHttpFailure,
+  openConnectionsService,
+  type ConnectionsService,
+} from './connections-service.js';
+import { registerConnectionRoutes } from './connections-routes.js';
 
 /**
  * The browser-facing HTTP server.
@@ -35,8 +48,24 @@ export interface ServerDependencies {
   readonly config: Config;
   readonly sessions?: SessionStore;
   readonly loginLimiter?: RateLimiter;
+  /**
+   * The connections store, for the screens that run before sign-in.
+   *
+   * Injected so a test can point it at a temporary file.
+   */
+  readonly connections?: ConnectionsService;
   /** Injected in tests so no broker is needed. */
-  readonly createClient?: () => { client: OresClient; connect: () => Promise<void> };
+  readonly createClient?: (endpoint: ConnectionEndpoint) => {
+    client: OresClient;
+    connect: () => Promise<void>;
+  };
+}
+
+/** Where a sign-in attempt should connect. */
+export interface ConnectionEndpoint {
+  readonly server: string;
+  readonly port: number;
+  readonly subjectPrefix: string;
 }
 
 export function buildServer(dependencies: ServerDependencies): FastifyInstance {
@@ -44,6 +73,9 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   const sessions =
     dependencies.sessions ??
     createSessionStore({ ttlSeconds: config.session.ttlSeconds });
+  // Opened once for the process: the database is this user's, and the master
+  // password lives on the instance for as long as the process runs.
+  const connections = dependencies.connections ?? openConnectionsService();
   const loginLimiter =
     dependencies.loginLimiter ??
     createRateLimiter({
@@ -169,7 +201,10 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   server.setErrorHandler(async (error, request, reply) => {
-    const failure = toHttpFailure(error);
+    // A store failure has a status of its own; the generic mapper would call
+    // it internal and hide the reason.
+    const failure =
+      error instanceof HttpFailure ? error : toHttpFailure(error);
     if (failure.status >= 500) {
       request.log.error({ err: error }, 'request failed');
     }
@@ -180,6 +215,10 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
   server.get('/api/health', async () => ({ status: 'ok' }));
 
+  // The connections screens run before sign-in, so these routes are not
+  // behind the session guard.
+  registerConnectionRoutes(server, connections);
+
   server.post('/api/session', async (request, reply) => {
     const parsed = httpLoginRequestSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -189,12 +228,36 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       throw invalidCredentials('Too many attempts. Wait a minute and try again.');
     }
 
-    const { client, connect } = createClient();
+    // The password is either the one typed on the screen or the one saved
+    // against the chosen connection. Either way it never reaches the browser
+    // from here.
+    let password: string;
+    try {
+      password =
+        parsed.data.connectionId.length > 0
+          ? connections.store.resolvePassword(
+              asConnectionId(parsed.data.connectionId),
+              parsed.data.password.length > 0 ? parsed.data.password : undefined,
+            )
+          : parsed.data.password;
+    } catch (error) {
+      throw asHttpFailure(error);
+    }
+    if (password.length === 0) {
+      throw invalidRequest('A password is required.');
+    }
+
+    const endpoint: ConnectionEndpoint = {
+      server: parsed.data.server,
+      port: parsed.data.port,
+      subjectPrefix: parsed.data.subjectPrefix,
+    };
+    const { client, connect } = createClient(endpoint);
     try {
       await connect();
       const outcome = await client.login({
         principal: parsed.data.username,
-        password: parsed.data.password,
+        password,
       });
 
       if (outcome.kind === 'rejected') {
@@ -311,6 +374,9 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
   server.addHook('onClose', async () => {
     await sessions.destroyAll();
+    if (dependencies.connections === undefined) {
+      connections.close();
+    }
   });
 
   return server;

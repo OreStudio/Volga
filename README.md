@@ -119,3 +119,53 @@ risk, so the intent is to generate them from the C++ codegen model.
 renders into the RFL structs and emits a language-neutral protocol IR. It
 covers the 148 codegen entities across 13 components, which is 1184 messages.
 See `doc/decisions/0001-protocol-types-from-codegen.org`.
+
+## The connections store
+
+Connections live in Volga's own store, not in the Qt client's file. It is a
+SQLite database at `$XDG_CONFIG_HOME/volga/connections.db`, which is
+`~/.config/volga/connections.db` by default. `VOLGA_DATA_DIR` moves the whole
+directory and `VOLGA_CONNECTIONS_DB` names the file.
+
+The store belongs to the person using it, so the interface shows the path. That
+is what makes "copy it to another machine" a file copy rather than an export
+format.
+
+Two things move a store:
+
+- **Copying the database** is exact. The write-ahead log is folded in first, so
+  the single file is complete. The browser saves it wherever the file dialog
+  points, and the server never chooses a path.
+- **A snapshot** is JSON and carries contents rather than the file, so a store
+  can be merged into one that already holds data, name clashes can be resolved,
+  and a subset selected. Passwords travel encrypted, so a snapshot is only as
+  safe as the master password it was written with.
+
+### The pre-authentication menus
+
+The chrome and its menus are present before sign-in, because managing
+connections is how you get somewhere to sign in to.
+
+- **Connections** opens the manager, and the import and export screens.
+- **Login** opens the sign-in screen, which follows the desktop client: a label
+  filter, a quick connect chooser grouped into Environments and Connections, an
+  optional unlock for stored credentials, and the server, port and namespace.
+
+Reads never need the master password. Environments, names and usernames are not
+secret, and the sign-in screen has to show somewhere to connect before anyone
+has identified themselves. Only saved passwords are encrypted, and only writes
+and credential use need the store unlocked.
+
+### Verifying the interface
+
+```sh
+npx tsx scripts/seed-connections-store.ts
+npx tsx --env-file=.runtime/verify.env packages/bff/src/main.ts
+npm run dev:web
+npx tsx scripts/verify-browser.ts
+```
+
+The verifier drives a real browser through the menus, the manager, the import
+and export screens, a rejected credential, quick connect filling the form from
+a saved connection, sign-in, and sign-out, and captures screenshots under
+`.runtime/screenshots/`.

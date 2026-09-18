@@ -66,14 +66,15 @@ export interface Config {
   readonly loginAttemptsPerMinute: number;
 }
 
-/** Reads configuration from the environment, or from `file` when given. */
-export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = environmentSchema.safeParse(environment);
-  if (!parsed.success) {
-    throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
-  }
-  const env = parsed.data;
+export type ConfigInput = z.input<typeof environmentSchema>;
 
+/**
+ * Builds a configuration from already-validated values.
+ *
+ * Exported so a test can construct one without certificate files on disk, which
+ * is what makes the connections routes testable without any infrastructure.
+ */
+export function buildConfig(env: z.infer<typeof environmentSchema>): Config {
   return {
     port: env.VOLGA_BFF_PORT,
     host: env.VOLGA_BFF_HOST,
@@ -95,6 +96,15 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config
     allowedOrigins: env.VOLGA_ALLOWED_ORIGINS,
     loginAttemptsPerMinute: env.VOLGA_LOGIN_ATTEMPTS_PER_MINUTE,
   };
+}
+
+/** Reads configuration from the environment. */
+export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
+  const parsed = environmentSchema.safeParse(environment);
+  if (!parsed.success) {
+    throw new Error(`Invalid configuration:\n${z.prettifyError(parsed.error)}`);
+  }
+  return buildConfig(parsed.data);
 }
 
 /**

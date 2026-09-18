@@ -1,8 +1,20 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/wire-protocol" },
-    { "path": "./packages/bff" },
-    { "path": "./packages/web" }
+    {
+      "path": "./packages/bff"
+    },
+    {
+      "path": "./packages/connections"
+    },
+    {
+      "path": "./packages/contracts"
+    },
+    {
+      "path": "./packages/web"
+    },
+    {
+      "path": "./packages/wire-protocol"
+    }
   ]
 }
