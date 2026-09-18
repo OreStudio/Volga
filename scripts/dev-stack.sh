@@ -77,13 +77,13 @@ case "${1:-start}" in
     wait_for_port 5432 postgres
 
     start_one bff npx tsx --env-file="$WORKSPACE/.env" "$WORKSPACE/packages/bff/src/main.ts"
-    wait_for_port 8080 bff
+    wait_for_port 21801 bff
 
-    start_one web npx vite --host 127.0.0.1 --port 5173 "$WORKSPACE/packages/web"
-    wait_for_port 5173 web
+    start_one web npx vite --host 127.0.0.1 --port 21802 "$WORKSPACE/packages/web"
+    wait_for_port 21802 web
 
     echo
-    echo "open http://127.0.0.1:5173/"
+    echo "open http://127.0.0.1:21802/"
     echo "logs in $LOG_DIR"
     ;;
 
@@ -96,7 +96,7 @@ case "${1:-start}" in
 
   status)
     echo "listening:"
-    ss -ltn 2>/dev/null | grep -E ":(21805|21806|5173|8080)\b" || echo "  nothing from this stack"
+    ss -ltn 2>/dev/null | grep -E ":(21801|21802|21805|21806)\b" || echo "  nothing from this stack"
     ;;
 
   *)

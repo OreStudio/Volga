@@ -16,7 +16,7 @@
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 
-const APP = process.env['VOLGA_APP_URL'] ?? 'http://127.0.0.1:5173/';
+const APP = process.env['VOLGA_APP_URL'] ?? 'http://127.0.0.1:21802/';
 const USERNAME = process.env['VOLGA_USER'] ?? 'volga_probe';
 const PASSWORD = process.env['VOLGA_PASSWORD'] ?? 'Secure-Password-123';
 const SHOTS = '.runtime/screenshots';

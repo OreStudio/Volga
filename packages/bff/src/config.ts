@@ -30,7 +30,7 @@ const environmentSchema = z.object({
   /** Origins allowed to call the API, comma separated. */
   VOLGA_ALLOWED_ORIGINS: z
     .string()
-    .default('http://localhost:5173')
+    .default('http://localhost:21802')
     .transform((value) => value.split(',').map((origin) => origin.trim()).filter(Boolean)),
   /**
    * Login attempts allowed per client per minute.

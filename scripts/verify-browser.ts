@@ -19,7 +19,7 @@
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 
-const APP_URL = process.env['VOLGA_APP_URL'] ?? 'http://127.0.0.1:5173/';
+const APP_URL = process.env['VOLGA_APP_URL'] ?? 'http://127.0.0.1:21802/';
 const USERNAME = process.env['ORES_PRINCIPAL'] ?? 'volga_probe';
 const PASSWORD = process.env['ORES_PASSWORD'] ?? 'Secure-Password-123';
 const SHOT_DIR = '.runtime/screenshots';

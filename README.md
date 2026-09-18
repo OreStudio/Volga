@@ -102,7 +102,7 @@ scripts/dev-stack.sh start
 ```
 
 That starts the broker, the IAM and refdata services, the BFF and the web
-server, then waits for each port. Open <http://127.0.0.1:5173/>.
+server, then waits for each port. Open <http://127.0.0.1:21802/>.
 
 Copy `.env.example` to `.env` first and fill in a session secret. The session
 secret is required and has no default, because a default would be a backdoor.

@@ -84,51 +84,133 @@ invents.
 
 ### A channel to the browser
 
-The browser never reaches NATS, so the BFF carries the news. One long-lived
-stream per session, not one per screen: a screen opening and closing must not
-churn connections, and a person with six lists open wants one stream.
+The browser never reaches NATS, so the BFF carries the news. One long-lived stream
+per session, not one per screen: a screen opening and closing must not churn
+connections, and a person with six lists open wants one stream.
 
 ```
 GET /api/events           text/event-stream
 ```
 
-The envelope already exists in the protocol package:
+The envelope already exists in the protocol package. `session-expired` and
+`party-changed` are already defined and are this channel's business, because they
+are the same question asked by different parts of the interface. This adds one
+kind:
 
 ```ts
-{ event: 'entity-changed', data: { component, entity, ids } }
+{ event: 'entity-changed', data: { component, entity, at } }
 ```
 
-The `entity-changed` kind is the addition. `session-expired` and `party-changed`
-are already defined and are the same channel's business, because they are the same
-question asked by different parts of the interface.
+### The payload is a time, not a list
 
-### Subscribing per entity
+This is the decision that matters most, and it is the one that keeps a bulk import
+from becoming a denial of service on the interface.
+
+**A change notification says "this collection changed at time T". It does not say
+which records.** A person cannot act on a list of a thousand identifiers, and the
+interface cannot do anything with them that it cannot do better itself. What it
+actually needs to know is one thing: *is what I am showing older than what
+exists?* A time answers that. A list does not.
+
+So the payload carries a watermark, and the client compares it against the time its
+data was loaded:
+
+```
+changed at 12:00:03  >  loaded at 11:59:58   →  stale
+changed at 11:59:41  >  loaded at 11:59:58   →  not stale, and nothing to do
+```
+
+**Coalescing falls out of that for free.** A thousand events from one import all
+carry a time after the client's load, so the first makes the screen stale and the
+remaining nine hundred and ninety-nine change nothing. They are not deduplicated
+by a special case; they are idempotent by construction. There is no ceiling to
+choose and no set to bound, because no set exists.
+
+**The rows that changed are worked out after the reload, not before it.** The
+client remembers when it last loaded, fetches, and marks the rows whose
+`recorded_at` is newer than that. This is what the Qt client does, and it is the
+only way to mark rows accurately: the events name a collection, so the records
+must be identified from the data rather than from the notification.
+
+### Subscriptions are shared, and routed
+
+One subscription per screen would be wrong twice over: a deployment with a hundred
+people watching accounts would open a hundred NATS subscriptions to the same
+subject, and every one of them would carry the same message.
+
+So a subscription is shared, keyed by the tenant and the entity, and the BFF keeps
+a map from that key to the sessions watching it:
+
+```
+  (tenant, component.entity)
+        │
+        ├── session A   ← has a list of countries open
+        ├── session B   ← has a list of countries open
+        └── session C   ← has a country open
+```
+
+**Keyed by tenant as well as entity, and that is not decoration.** Tenancy is the
+boundary the whole system is built on: a change in one tenant's accounts is not
+news in another's, and telling a session about it would leak the fact that it
+happened. Every subscription therefore carries the tenant of the sessions it
+serves, and a session is only ever routed news from its own.
+
+**Reference counted, and torn down when the last watcher goes.** The map entry
+exists while at least one session watches and is removed when the last one stops,
+so a subscription is not held open for an entity nobody is looking at. A person
+who navigates away stops watching that entity and keeps watching nothing else
+until they navigate somewhere that watches something.
+
+**A session watches what is on screen.** A list of countries watches `country`. A
+country's detail screen watches that record's entity, because the record it is
+showing is in it. A screen that watches nothing is not subscribed to anything, and
+that is the normal state of most of the interface.
+
+### What is out of scope, for now
+
+**Only the entity itself.** A change to a country is news to the country list. It
+is *also* news to a book that references one, and to anything showing a country's
+name by lookup — and none of those are told, because the event names the entity
+that changed and not the entities that depend on it. This is the right thing to
+leave for later: the dependency graph is real, it is not derivable from the
+notification, and getting it wrong means a screen that refreshes constantly for
+reasons nobody can see.
+
+**It follows that a screen can be quietly out of date about something it shows by
+reference.** A book list showing a country's name will keep showing the old name
+until something else makes it reload. That is a known limitation rather than a
+bug, and it is recorded here so it is not mistaken for one later.
+
+### Subscribing per entity, in the interface
 
 ```ts
 // The list and the detail screen both use this, so both learn the same way.
-const { stale, changedIds, reload, clear } = useEntityChanges('refdata', 'country');
+const { stale, markChanged, reload } = useEntityChanges('refdata', 'country');
 ```
 
-`stale` is true once any change has been reported and stays true until `reload()`
-or `clear()`. `changedIds` holds the records named by the events since the last
-reload, so the rows that moved can be marked.
+`stale` is true once a watermark after the load has been seen, and stays true
+until the screen reloads. `markChanged(rows)` records which rows were newer than
+the previous load, so the table can mark them.
 
 ### What the screen does with it
 
 ```tsx
 // The reload affordance carries the news.
-<Button pending={stale} onClick={reload} title={stale ? t('entity.changed') : t('entity.refresh')}>
+<Button
+  pending={stale}
+  onClick={reload}
+  title={stale ? t('entity.changed') : t('entity.refresh')}
+>
   {t('entity.refresh')}
 </Button>
 
-// The rows that moved are marked.
-<DataTable columns={meta.columns} rows={rows} changed={changedIds} ... />
+// The rows that moved are marked, worked out from the reload, not from the event.
+<DataTable columns={meta.columns} rows={rows} changed={changedRowKeys} {...} />
 ```
 
 `changed` on the table is a set of row keys, not a flag. A whole table flashing
-says nothing; the four rows that changed say everything.
-
----
+says nothing; the four rows that changed say everything — and they are the four
+the data says changed, which is the only account of it that can be trusted.
 
 ## 5. The visual language
 
@@ -187,12 +269,13 @@ Named rather than assumed, because they change the shape.
 per session is simpler and costs a fan-out; one per deployment needs a registry of
 who is watching what. The first is right until the number of sessions is large.
 
-**How are changes to something a screen is not showing handled?** A country that
-is referenced by a book, changed while somebody is editing the book. The event
-names a country; the book screen is affected but is not watching countries. This
-is the hard case and it is not solved here.
+**How are changes to something a screen is not showing handled?** A country
+referenced by a book, changed while somebody is editing the book. The event names
+the country; the book screen is affected and is not watching countries. Out of
+scope for now, as above, and the dependency graph is the work.
 
-**What is the ceiling on `changedIds`?** A bulk import changes ten thousand
-records, and a set of ten thousand row keys is not a mark on a row, it is a
-different state — probably "this whole collection changed". The rule is that the
-set has a ceiling and past it the screen goes stale without naming rows.
+**How long does a watcher survive?** A session that navigates away stops
+watching, but a session that is idle with a list open keeps its subscription
+alive. Whether an idle session should keep one open, and for how long, is a
+question about cost rather than correctness; the honest default is to keep it,
+because tearing it down and back up is how a screen ends up missing a change.
