@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import {
   NatsTransport,
   OresClient,
-  accountListSchema,
+  accountPageSchema,
   deleteAccount,
   listAccountsRequestSchema,
   loginResultSchema,
-  httpLoginRequestSchema,
   selectPartyRequestSchema,
   sessionViewSchema,
   setAccountsLocked,
@@ -16,80 +16,63 @@ import {
   type LoginOutcome,
   type PartySummary,
 } from '@volga/protocol';
+import { credentialsSchema, siteStateSchema } from '@volga/contracts';
+import {
+  tlsMaterialFor,
+  type LoadedSiteConfiguration,
+} from './site-config.js';
 import type { Config } from './config.js';
 import { createRateLimiter, type RateLimiter } from './rate-limit.js';
 import { createSessionStore, type LiveSession, type SessionStore } from './sessions.js';
-import {
-  HttpFailure,
-  invalidCredentials,
-  invalidRequest,
-  notAuthenticated,
-  toHttpFailure,
-} from './errors.js';
-import { connectionId as asConnectionId } from '@volga/connections';
-import {
-  asHttpFailure,
-  openConnectionsService,
-  type ConnectionsService,
-} from './connections-service.js';
-import { registerConnectionRoutes } from './connections-routes.js';
+import { invalidCredentials, invalidRequest, notAuthenticated, toHttpFailure, HttpFailure } from './errors.js';
 
 /**
  * The browser-facing HTTP server.
  *
- * The browser never speaks msgpack and never sees a wire field name. It sends
- * and receives the JSON contract in `contracts.ts`, and this server is the
- * only place that translates between that contract and the bus.
+ * The browser speaks JSON and knows nothing about how the application reaches
+ * ORE Studio. It is told which environment it is signed in to so it can say so
+ * on screen, and that is all: not the host, not the port, not the namespace.
+ * A browser that can name a host can ask the server to connect to it, and this
+ * one cannot.
+ *
+ * The environment is chosen when the process starts and never changes, so every
+ * route here talks to the same place for as long as the process runs.
  */
 
 const SESSION_COOKIE = 'volga_session';
 
 export interface ServerDependencies {
   readonly config: Config;
+  readonly site: LoadedSiteConfiguration;
   readonly sessions?: SessionStore;
   readonly loginLimiter?: RateLimiter;
-  /**
-   * The connections store, for the screens that run before sign-in.
-   *
-   * Injected so a test can point it at a temporary file.
-   */
-  readonly connections?: ConnectionsService;
   /** Injected in tests so no broker is needed. */
-  readonly createClient?: (endpoint: ConnectionEndpoint) => {
-    client: OresClient;
-    connect: () => Promise<void>;
-  };
-}
-
-/** Where a sign-in attempt should connect. */
-export interface ConnectionEndpoint {
-  readonly server: string;
-  readonly port: number;
-  readonly subjectPrefix: string;
+  readonly createClient?: () => { client: OresClient; connect: () => Promise<void> };
 }
 
 export function buildServer(dependencies: ServerDependencies): FastifyInstance {
-  const { config } = dependencies;
+  const { config, site } = dependencies;
   const sessions =
-    dependencies.sessions ??
-    createSessionStore({ ttlSeconds: config.session.ttlSeconds });
-  // Opened once for the process: the database is this user's, and the master
-  // password lives on the instance for as long as the process runs.
-  const connections = dependencies.connections ?? openConnectionsService();
+    dependencies.sessions ?? createSessionStore({ ttlSeconds: config.session.ttlSeconds });
   const loginLimiter =
     dependencies.loginLimiter ??
-    createRateLimiter({
-      maxAttempts: config.loginAttemptsPerMinute,
-      windowSeconds: 60,
-    });
+    createRateLimiter({ maxAttempts: config.loginAttemptsPerMinute, windowSeconds: 60 });
 
-  const createClient =
-    dependencies.createClient ??
-    (() => {
+  const injectedClient = dependencies.createClient;
+  const createClient = (): { client: OresClient; connect: () => Promise<void> } => {
+    if (injectedClient !== undefined) {
+      return injectedClient();
+    }
+    {
+      const tls = tlsMaterialFor(site.configuration, site.environment);
       const transport = new NatsTransport({
-        server: config.nats.url,
-        subjectPrefix: config.nats.subjectPrefix,
-        tls: config.nats.tls,
+        server: `nats://${site.environment.host}:${site.environment.port}`,
+        subjectPrefix: site.environment.subjectPrefix,
+        tls: {
+          ca: readPem(tls.ca, 'VOLGA_SITE_CONFIG tls.ca'),
+          cert: readPem(tls.cert, 'VOLGA_SITE_CONFIG tls.cert'),
+          key: readPem(tls.key, 'VOLGA_SITE_CONFIG tls.key'),
+        },
         name: 'volga-bff',
         // The C++ client's library defaults, made explicit so the behaviour is
         // visible here rather than inherited silently.
@@ -97,14 +80,15 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         maxReconnectAttempts: 60,
       });
       return {
-        client: new OresClient({ transport, format: config.nats.format }),
+        client: new OresClient({ transport }),
         connect: () => transport.connect(),
       };
-    });
+    }
+  };
 
   const server = Fastify({
     logger: {
-      level: process.env['VOLGA_LOG_LEVEL'] ?? 'info',
+      level: config.logLevel,
       // Never log a credential or a token.
       redact: ['req.headers.cookie', 'req.headers.authorization'],
     },
@@ -152,7 +136,6 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     });
   }
 
-  /** Builds the browser's view of a freshly authenticated login. */
   function loginResult(outcome: LoginOutcome): unknown {
     if (outcome.kind === 'party-selection-required') {
       return loginResultSchema.parse({
@@ -201,10 +184,7 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
   });
 
   server.setErrorHandler(async (error, request, reply) => {
-    // A store failure has a status of its own; the generic mapper would call
-    // it internal and hide the reason.
-    const failure =
-      error instanceof HttpFailure ? error : toHttpFailure(error);
+    const failure = error instanceof HttpFailure ? error : toHttpFailure(error);
     if (failure.status >= 500) {
       request.log.error({ err: error }, 'request failed');
     }
@@ -215,12 +195,31 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
   server.get('/api/health', async () => ({ status: 'ok' }));
 
-  // The connections screens run before sign-in, so these routes are not
-  // behind the session guard.
-  registerConnectionRoutes(server, connections);
+  /**
+   * What the interface needs to render itself.
+   *
+   * The environment is named so the interface can say so, and the developer
+   * accounts are offered only when the deployment says so. Note what is absent:
+   * the host, the port, the namespace and the certificates.
+   */
+  server.get('/api/site', async () =>
+    siteStateSchema.parse({
+      appName: 'ORE Studio',
+      environment: {
+        id: site.environment.id,
+        displayName: site.environment.displayName,
+        description: site.environment.description,
+        nonProduction: site.environment.nonProduction,
+      },
+      developerTools: site.configuration.developerTools,
+      developerAccounts: site.configuration.developerTools
+        ? site.configuration.developerAccounts
+        : [],
+    }),
+  );
 
   server.post('/api/session', async (request, reply) => {
-    const parsed = httpLoginRequestSchema.safeParse(request.body);
+    const parsed = credentialsSchema.safeParse(request.body);
     if (!parsed.success) {
       throw invalidRequest('A username and password are required.');
     }
@@ -228,36 +227,12 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       throw invalidCredentials('Too many attempts. Wait a minute and try again.');
     }
 
-    // The password is either the one typed on the screen or the one saved
-    // against the chosen connection. Either way it never reaches the browser
-    // from here.
-    let password: string;
-    try {
-      password =
-        parsed.data.connectionId.length > 0
-          ? connections.store.resolvePassword(
-              asConnectionId(parsed.data.connectionId),
-              parsed.data.password.length > 0 ? parsed.data.password : undefined,
-            )
-          : parsed.data.password;
-    } catch (error) {
-      throw asHttpFailure(error);
-    }
-    if (password.length === 0) {
-      throw invalidRequest('A password is required.');
-    }
-
-    const endpoint: ConnectionEndpoint = {
-      server: parsed.data.server,
-      port: parsed.data.port,
-      subjectPrefix: parsed.data.subjectPrefix,
-    };
-    const { client, connect } = createClient(endpoint);
+    const { client, connect } = createClient();
     try {
       await connect();
       const outcome = await client.login({
         principal: parsed.data.username,
-        password,
+        password: parsed.data.password,
       });
 
       if (outcome.kind === 'rejected') {
@@ -304,8 +279,6 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
       throw invalidRequest('A partyId is required.');
     }
 
-    // The pending state is only meaningful during login, so the expectation
-    // the protocol layer needs is reconstructed from the token it holds.
     const outcome = await session.client.selectParty({
       partyId: parsed.data.partyId,
       expected: {
@@ -339,30 +312,19 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
     });
 
     const page = await session.client.listAccounts(input);
-    return accountListSchema.parse({
-      accounts: page.accounts,
-      totalCount: page.totalCount,
-    });
+    return { accounts: page.accounts, totalCount: page.totalCount };
   });
 
   server.post('/api/accounts/:id/lock', async (request) => {
     const session = requireSession(request);
     const { id } = request.params as { id: string };
-    const results = await setAccountsLocked(session.client, {
-      accountIds: [id],
-      locked: true,
-    });
-    return { results };
+    return { results: await setAccountsLocked(session.client, { accountIds: [id], locked: true }) };
   });
 
   server.post('/api/accounts/:id/unlock', async (request) => {
     const session = requireSession(request);
     const { id } = request.params as { id: string };
-    const results = await setAccountsLocked(session.client, {
-      accountIds: [id],
-      locked: false,
-    });
-    return { results };
+    return { results: await setAccountsLocked(session.client, { accountIds: [id], locked: false }) };
   });
 
   server.delete('/api/accounts/:id', async (request) => {
@@ -374,12 +336,26 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
 
   server.addHook('onClose', async () => {
     await sessions.destroyAll();
-    if (dependencies.connections === undefined) {
-      connections.close();
-    }
   });
 
   return server;
+}
+
+/**
+ * Reads certificate material.
+ *
+ * A value naming an existing file is read from disk; anything else is treated
+ * as inline PEM, so a deployment can supply either.
+ */
+function readPem(value: string, label: string): string {
+  if (value.includes('-----BEGIN')) {
+    return value;
+  }
+  try {
+    return readFileSync(value, 'utf8');
+  } catch (cause) {
+    throw new Error(`Cannot read ${label} at ${value}`, { cause });
+  }
 }
 
 export { SESSION_COOKIE };

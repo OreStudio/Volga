@@ -10,14 +10,15 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --build --force",
     "test": "vitest run"
   },
   "dependencies": {
-    "@volga/connections": "*",
     "zod": "4.6.5"
   },
   "devDependencies": {

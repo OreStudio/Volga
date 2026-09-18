@@ -6,6 +6,9 @@ import { apiErrorSchema, type ApiError } from '@volga/protocol/browser';
  * One place decides how a request is made and how a failure is turned into
  * something a component can show. Every response is parsed with a schema at the
  * call site, so this layer only deals with the mechanics.
+ *
+ * Note what a request can carry: an identity, and nothing about where the
+ * application connects. That is fixed by the deployment.
  */
 
 /** A failure the UI can present, already narrowed from the error contract. */

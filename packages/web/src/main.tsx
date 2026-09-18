@@ -11,8 +11,6 @@ import { AppChrome } from './AppShell.js';
 import { LandingPage } from './pages/LandingPage.js';
 import { SignInPage } from './pages/SignInPage.js';
 import { AccountsPage } from './pages/AccountsPage.js';
-import { ConnectionsPage } from './pages/ConnectionsPage.js';
-import { ExportPage, ImportPage } from './pages/TransferPages.js';
 import './styles.css';
 
 /**
@@ -45,11 +43,7 @@ function App(): ReactNode {
   return (
     <AppChrome>
       <Routes>
-        {/* Reachable without signing in: this is how you get somewhere to sign in to. */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/connections" element={<ConnectionsPage />} />
-        <Route path="/connections/import" element={<ImportPage />} />
-        <Route path="/connections/export" element={<ExportPage />} />
         <Route path="/login" element={<SignInRoute />} />
 
         {/* The rest needs a session. */}

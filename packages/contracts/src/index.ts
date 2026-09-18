@@ -5,5 +5,8 @@
  * serialised with the definition the server serialised it from. That is the
  * only way a network boundary gets checked without a code generator, and it
  * means a shape change fails loudly on whichever side is stale.
+ *
+ * It carries no Node dependency, because the browser loads it too.
  */
-export * from './connections.js';
+export * from './site.js';
+export * from './session.js';

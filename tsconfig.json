@@ -5,9 +5,6 @@
       "path": "./packages/bff"
     },
     {
-      "path": "./packages/connections"
-    },
-    {
       "path": "./packages/contracts"
     },
     {

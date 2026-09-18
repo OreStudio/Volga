@@ -16,7 +16,6 @@
     "@fastify/cookie": "^11.0.2",
     "@volga/protocol": "*",
     "fastify": "5.12.5",
-    "@volga/connections": "*",
     "@volga/contracts": "*"
   },
   "devDependencies": {

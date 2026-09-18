@@ -18,33 +18,17 @@ import { ApiFailure, request } from './transport.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
 
-/** Where to connect, from the environment or connection the person chose. */
-export interface LoginEndpoint {
-  readonly server: string;
-  readonly port: number;
-  readonly subjectPrefix: string;
-  /** Set when signing in with a saved connection, so its stored password is used. */
-  readonly connectionId?: string;
-}
-
 export interface Credentials {
   readonly username: string;
   readonly password: string;
 }
 
 export const api = {
-  async login(credentials: Credentials, endpoint: LoginEndpoint): Promise<LoginResult> {
+  async login(credentials: Credentials): Promise<LoginResult> {
     const payload = await request('/api/session', {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({
-        username: credentials.username,
-        password: credentials.password,
-        server: endpoint.server,
-        port: endpoint.port,
-        subjectPrefix: endpoint.subjectPrefix,
-        connectionId: endpoint.connectionId ?? '',
-      }),
+      body: JSON.stringify(credentials),
     });
     return loginResultSchema.parse(payload);
   },

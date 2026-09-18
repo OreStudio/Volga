@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, type LoginEndpoint } from '../api/client.js';
+import { api } from '../api/client.js';
 import { ApiFailure } from '../api/transport.js';
 import type { PartySummary, SessionView } from '@volga/protocol/browser';
 
@@ -35,10 +35,7 @@ export type SignInOutcome =
 
 interface SessionContextValue {
   readonly state: SessionState;
-  readonly signIn: (
-    credentials: { username: string; password: string },
-    endpoint: LoginEndpoint,
-  ) => Promise<SignInOutcome>;
+  readonly signIn: (credentials: { username: string; password: string }) => Promise<SignInOutcome>;
   readonly chooseParty: (partyId: string, parties: readonly PartySummary[]) => Promise<void>;
   readonly signOut: () => Promise<void>;
 }
@@ -109,8 +106,8 @@ export function SessionProvider({ children }: { readonly children: ReactNode }):
   }, [data, isError, isPending, error]);
 
   const signIn = useCallback<SessionContextValue['signIn']>(
-    async (credentials, endpoint) => {
-      const result = await api.login(credentials, endpoint);
+    async (credentials) => {
+      const result = await api.login(credentials);
       if (result.outcome === 'active') {
         queryClient.setQueryData(SESSION_QUERY_KEY, result.session);
         setState({ status: 'authenticated', session: result.session });

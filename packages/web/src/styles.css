@@ -11,33 +11,40 @@
  */
 @import 'tailwindcss';
 
+/*
+ * The palette is taken from the project site at orestudio.github.io so a link
+ * from there arrives somewhere that looks like the same project.
+ */
 @theme {
-  --color-surface-base: #0b0e14;
-  --color-surface-raised: #11151f;
-  --color-surface-overlay: #171c28;
-  --color-surface-hover: #1e2433;
+  --color-bg-primary: #121214;
+  --color-bg-secondary: #1a1a1e;
+  --color-surface-base: #121214;
+  --color-surface-raised: #1a1a1e;
+  --color-surface-overlay: #26262b;
+  --color-surface-hover: #26262b;
 
-  --color-line-subtle: #1b2230;
-  --color-line: #262f42;
-  --color-line-strong: #3a465e;
+  --color-line-subtle: #21262d;
+  --color-line: #30363d;
+  --color-line-strong: #4a5568;
 
-  --color-ink: #e4e9f2;
-  --color-ink-muted: #93a0b8;
-  --color-ink-faint: #6b7891;
-  --color-ink-inverse: #0b0e14;
+  --color-ink: #e3e3e6;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-faint: #71717a;
+  --color-ink-inverse: #0d1117;
 
-  --color-accent: #4f8ef7;
-  --color-accent-bright: #6ea3ff;
-  --color-accent-dim: #1d2f52;
+  --color-accent: #58a6ff;
+  --color-accent-bright: #8ab4f8;
+  --color-accent-dim: #21262d;
 
-  --color-up: #35c07a;
-  --color-down: #f2555a;
-  --color-warn: #d8a03d;
+  --color-up: #3fb950;
+  --color-down: #f85149;
+  --color-warn: #d29922;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  --radius-card: 0.75rem;
+  --radius-card: 0.5rem;
 }
 
 /*
@@ -52,7 +59,10 @@
   }
 
   body {
-    @apply bg-surface-base text-ink font-sans antialiased;
+    @apply bg-bg-primary text-ink font-sans antialiased;
+    /* The project site sets 1.75, and matching it is most of what makes two
+       pages read as one publication. */
+    line-height: 1.75;
   }
 
   /* Focus is always visible. A keyboard user must never lose their place. */
