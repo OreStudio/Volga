@@ -95,9 +95,6 @@ facet. Confirming or adding that plumbing is explicitly part of the work:
 The information exists and the Qt archetypes already read it. What may not exist
 is the route from those tables to this facet, and finding out is the first task.
 
-If any of these turns out not to be derived for the entity model types this facet
-targets, deriving it is part of the work; the list is the requirement.
-
 ---
 
 ## 3. What to emit
@@ -112,103 +109,346 @@ projects/ores.typescript/src/{component}/ui/{entity}_ui.ts
 One file per entity, containing pure data and no imports, so the declaration can
 be consumed anywhere without pulling a dependency.
 
-### 3.1 The shape
+### 3.1 Worked example: country
+
+Country is the reference, because it is a flat entity that the generated standard
+already handles and the C++ side already uses as its own example. This is what
+the generator should produce for it, in full.
+
+Source, from `projects/ores.refdata/modeling/ores.refdata.country.org`:
+
+```
+*** Detail fields
+| field         | label         | widget            | type      | is_key | is_required | placeholder              |
+| alpha2_code   | Alpha-2 Code  | codeEdit          | line_edit | true   | true        | Enter country alpha2 code|
+| alpha3_code   | Alpha-3 Code  | alpha3CodeEdit    | line_edit |        | true        | Enter country alpha3 code|
+| numeric_code  | Numeric Code  | numericCodeEdit   | line_edit |        | true        | Enter ISO numeric code   |
+| name          | Name          | nameEdit          | line_edit |        | true        | Enter display name       |
+| official_name | Official Name | officialNameEdit  | line_edit |        | true        | Enter official country name|
+
+*** Columns (Qt model)
+| enum_name    | field         | header        | type      | width |
+| Alpha2Code   | alpha2_code   | Alpha-2 Code  | string    | 80    |
+| Alpha3Code   | alpha3_code   | Alpha-3 Code  | string    | 80    |
+| NumericCode  | numeric_code  | Numeric Code  | string    | 80    |
+| Name         | name          | Name          | string    | 200   |
+| OfficialName | official_name | Official Name | string    | 200   |
+| Version      | version       | Version       | int       | 80    |
+| ModifiedBy   | modified_by   | Modified By   | string    | 120   |
+| RecordedAt   | recorded_at   | Recorded At   | timestamp | 150   |
+```
+
+Output, at `projects/ores.typescript/src/refdata/ui/country_ui.ts`:
 
 ```ts
+/** -*- mode: typescript-ts-mode; tab-width: 4; indent-tabs-mode: nil -*-
+ *
+ * Copyright (C) 2026 Marco Craveiro <marco.craveiro@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation; either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 51
+ * Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ */
 /**
  * AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
  * Template: ts_ui.ts.mustache
  * To modify, update the template and regenerate.
+ *
+ * Labels and headers are translation keys, not English. The English words are in
+ * the locale catalogue under the same keys.
+ *
+ * Field grouping into tabs is deliberately absent: it is a domain judgement the
+ * model does not carry. See country_field_groups.ts beside this file.
  */
+import type { ColumnMeta, FieldMeta } from '../../ui-contract.js';
 
 /**
- * Every field of an account, in the order the model declares them.
+ * The fields of a country, in the order the model declares them.
  *
- * Labels are translation keys, not English. The catalogue holds the words.
+ * `alpha2_code` is the natural key, so it is editable when creating and
+ * read-only afterwards.
  */
-export const accountFields = [
+export const countryFields: readonly FieldMeta[] = [
   {
-    /** The wire field name. Also the key in the domain type. */
-    name: 'username',
-    /** Translation key for the label. */
-    labelKey: 'account.fldUsername',
-    /** Which control renders it. */
+    name: 'alpha2_code',
+    labelKey: 'country.fldAlpha2Code',
     control: 'line_edit',
-    /** Whether a value must be supplied. */
     required: true,
-    /** The natural key: editable when creating, read-only afterwards. */
     isKey: true,
-    /** Translation key for the placeholder, when the model gives one. */
-    placeholderKey: 'account.username.ph',
-    /** Whether the field can hold no value. */
+    readOnlyAfterCreate: true,
     nullable: false,
+    placeholderKey: 'country.alpha2CodePh',
+    maxLength: 2,
   },
   {
-    name: 'account_type',
-    labelKey: 'account.fldType',
-    control: 'static_combo',
+    name: 'alpha3_code',
+    labelKey: 'country.fldAlpha3Code',
+    control: 'line_edit',
     required: true,
     isKey: false,
     nullable: false,
-    options: [
-      { value: 'user', labelKey: 'account.type.user' },
-      { value: 'service', labelKey: 'account.type.service' },
-    ],
+    placeholderKey: 'country.alpha3CodePh',
+    maxLength: 3,
   },
   {
-    name: 'reports_to_account_id',
-    labelKey: 'account.fldReportsTo',
-    control: 'dynamic_combo',
-    required: false,
-    isKey: false,
-    nullable: true,
-    /** The collection the options come from, when the model names one. */
-    lookup: 'accounts',
-  },
-  {
-    name: 'is_admin',
-    labelKey: 'account.fldIsAdmin',
-    control: 'check_box',
-    required: false,
+    name: 'numeric_code',
+    labelKey: 'country.fldNumericCode',
+    control: 'line_edit',
+    required: true,
     isKey: false,
     nullable: false,
-    triState: false,
+    placeholderKey: 'country.numericCodePh',
+    maxLength: 3,
   },
-] as const;
+  {
+    name: 'name',
+    labelKey: 'country.fldName',
+    control: 'line_edit',
+    required: true,
+    isKey: false,
+    nullable: false,
+    placeholderKey: 'country.namePh',
+  },
+  {
+    name: 'official_name',
+    labelKey: 'country.fldOfficialName',
+    control: 'line_edit',
+    required: true,
+    isKey: false,
+    nullable: false,
+    placeholderKey: 'country.officialNamePh',
+  },
+];
 
 /**
  * The table columns, in display order.
  *
- * Audit columns are marked hidden so the shared table can offer them through the
- * column menu without showing them by default.
+ * `alpha2_code` carries the flag, which is why its style is `icon_text_left`.
+ * The audit columns are hidden by default and offered through the column menu.
  */
-export const accountColumns = [
+export const countryColumns: readonly ColumnMeta[] = [
   {
-    /** The wire field name, which is what the row object holds. */
-    name: 'username',
-    headerKey: 'account.colUsername',
+    name: 'alpha2_code',
+    headerKey: 'country.colAlpha2Code',
+    style: 'icon_text_left',
+    hidden: false,
+    width: 80,
+    flag: true,
+  },
+  {
+    name: 'alpha3_code',
+    headerKey: 'country.colAlpha3Code',
     style: 'text_left',
     hidden: false,
-    /** A width hint, not a constraint; the user's own resize wins. */
+    width: 80,
+  },
+  {
+    name: 'numeric_code',
+    headerKey: 'country.colNumericCode',
+    style: 'mono_left',
+    hidden: false,
+    width: 80,
+  },
+  {
+    name: 'name',
+    headerKey: 'country.colName',
+    style: 'text_left',
+    hidden: false,
     width: 200,
   },
   {
+    name: 'official_name',
+    headerKey: 'country.colOfficialName',
+    style: 'text_left',
+    hidden: false,
+    width: 200,
+  },
+  {
+    name: 'version',
+    headerKey: 'country.colVersion',
+    style: 'mono_center',
+    hidden: true,
+    width: 80,
+  },
+  {
+    name: 'modified_by',
+    headerKey: 'country.colModifiedBy',
+    style: 'text_left',
+    hidden: true,
+    width: 120,
+  },
+  {
     name: 'recorded_at',
-    headerKey: 'account.colRecorded',
+    headerKey: 'country.colRecordedAt',
     style: 'mono_left',
     hidden: true,
     width: 150,
   },
-] as const;
+];
+
+/**
+ * The collection name the list request uses, and the display field.
+ *
+ * Emitted so the sidebar and the lookup selects do not have to know it
+ * separately.
+ */
+export const countryMeta = {
+  entity: 'country',
+  collection: 'countries',
+  displayField: 'name',
+  keyField: 'alpha2_code',
+  columns: countryColumns,
+  fields: countryFields,
+} as const;
 ```
 
-### 3.2 The TypeScript contract
+#### The hand-written overlay, beside it
 
-Written here so the emitted shape and the consuming code agree. The consuming
-side will declare these; the generator must produce values assignable to them.
+This is the whole of what remains manual, and `country_field_groups.ts` is the
+file the component specification calls the entity's only new file.
 
 ```ts
-/** How a cell is rendered. The set is closed. */
+import type { FieldGroup } from '../../ui-contract.js';
+
+/**
+ * How a country's fields are grouped into tabs.
+ *
+ * Order matters: the groups are shown in this order, `general` first, and
+ * Provenance is appended by the shared detail screen rather than listed here.
+ */
+export const countryFieldGroups: readonly FieldGroup[] = [
+  {
+    id: 'general',
+    titleKey: 'entity.general',
+    fields: ['alpha2_code', 'alpha3_code', 'numeric_code', 'name', 'official_name'],
+  },
+];
+```
+
+Nothing else is written for a country. The list screen, the detail screen, the
+table, the form and the history screen are the shared ones.
+
+### 3.2 Worked example: the awkward constructs
+
+Country is flat, so it does not show the constructs that make a generator worth
+having. These fragments are from an account-shaped entity and are the cases the
+template must handle beyond strings. Emitted into the same file, in the same two
+arrays.
+
+```ts
+// A static combo: the options are declared, so they come from the model.
+{
+  name: 'account_type',
+  labelKey: 'account.fldType',
+  control: 'static_combo',
+  required: true,
+  isKey: false,
+  nullable: false,
+  readOnlyAfterCreate: true,   // changing what a record is changes what it means
+  options: [
+    { value: 'user', labelKey: 'account.type.user' },
+    { value: 'service', labelKey: 'account.type.service' },
+    { value: 'algorithm', labelKey: 'account.type.algorithm' },
+    { value: 'llm', labelKey: 'account.type.llm' },
+  ],
+},
+
+// A dynamic combo: the options are fetched, so the declaration names the source.
+{
+  name: 'default_party_id',
+  labelKey: 'account.fldDefaultParty',
+  control: 'dynamic_combo',
+  required: false,
+  isKey: false,
+  nullable: true,
+  lookup: { collection: 'parties', valueField: 'id', labelField: 'full_name' },
+},
+
+// A nullable checkbox: "not set" is a third state, distinct from false.
+{
+  name: 'is_locked',
+  labelKey: 'account.fldLocked',
+  control: 'check_box',
+  required: false,
+  isKey: false,
+  nullable: true,
+  triState: true,
+},
+
+// A bounded number.
+{
+  name: 'failed_login_count',
+  labelKey: 'account.fldFailedLogins',
+  control: 'spin_box',
+  required: false,
+  isKey: false,
+  nullable: false,
+  min: 0,
+  max: 9999,
+},
+
+// A column that renders as a pill, resolved against a code domain.
+{
+  name: 'account_type',
+  headerKey: 'account.colType',
+  style: 'badge_centered',
+  hidden: false,
+  width: 100,
+  codeDomain: 'account_type',
+},
+
+// A boolean column.
+{
+  name: 'is_locked',
+  headerKey: 'account.colLocked',
+  style: 'badge_centered',
+  hidden: false,
+  width: 90,
+  codeDomain: 'account_locked',
+},
+
+// A timestamp column, rendered relative with the exact value on hover.
+{
+  name: 'recorded_at',
+  headerKey: 'account.colRecorded',
+  style: 'mono_left',
+  hidden: true,
+  width: 150,
+  temporal: true,
+},
+```
+
+That is the complete vocabulary the generator has to emit. Anything that does not
+appear in these two examples should not be in the output, and if a model needs
+something that is not here, the contract gains a member rather than the template
+gaining a special case.
+
+**These examples compile.** They were checked against the contract in section 3.3
+under `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, with
+no DOM library loaded, so the fragment above is real TypeScript and not only a
+sketch. A template producing this output will satisfy the first of the three
+checks in section 7 before it is even generated.
+
+### 3.3 The TypeScript contract
+
+Written here so the emitted shape and the consuming code agree. The consuming
+side declares these once, in `ui-contract.ts`, and the generated files import the
+two they need. That import is type-only, so it disappears at compile time and the
+generated file has no runtime dependency.
+
+```ts
+/** How a cell is rendered. The set is closed and matches the C++ column styles. */
 export type ColumnStyle =
   | 'text_left'
   | 'text_center'
@@ -221,7 +461,7 @@ export type ColumnStyle =
   | 'icon_text_left'
   | 'badge_centered';
 
-/** How a field is edited. The set is closed. */
+/** How a field is edited. The set is closed and matches the model's widget types. */
 export type FieldControl =
   | 'line_edit'
   | 'text_edit'
@@ -234,43 +474,109 @@ export type FieldControl =
   | 'date';
 
 export interface ColumnMeta {
+  /** The wire field name, which is the key the row object holds. */
   readonly name: string;
+  /** Translation key for the header. */
   readonly headerKey: string;
   readonly style: ColumnStyle;
+  /** Hidden by default, available through the column menu. */
   readonly hidden: boolean;
+  /** A width hint in pixels. The user's own resize wins. */
   readonly width?: number;
-  /** Set when the column renders as a pill, so the table knows the domain. */
-  readonly badgeKey?: string;
-  /** Set when the column renders a flag. */
+  /**
+   * The code domain a pill resolves against, for `badge_centered`. The shared
+   * table looks the display text and colour up rather than the model carrying
+   * them, so a rebranded badge changes in one place.
+   */
+  readonly codeDomain?: string;
+  /** True when the cell renders a flag. */
   readonly flag?: boolean;
+  /** True when the value is a timestamp, so the cell renders it relatively. */
+  readonly temporal?: boolean;
 }
 
 export interface FieldOption {
+  /** The stored value. */
   readonly value: string;
+  /** Translation key for what the person sees. */
   readonly labelKey: string;
+}
+
+/** Where a foreign key's options come from. */
+export interface LookupSource {
+  /** The collection to fetch. */
+  readonly collection: string;
+  /** The field holding the stored value. */
+  readonly valueField: string;
+  /** The field holding the display text. */
+  readonly labelField: string;
 }
 
 export interface FieldMeta {
+  /** The wire field name. */
   readonly name: string;
+  /** Translation key for the label. */
   readonly labelKey: string;
   readonly control: FieldControl;
+  /** A value must be supplied. */
   readonly required: boolean;
+  /** The natural key. */
   readonly isKey: boolean;
+  /** The field may hold no value. */
   readonly nullable: boolean;
+  /** Translation key for the placeholder, when the model gives one. */
   readonly placeholderKey?: string;
+  /** Translation key for a hint below the control. */
   readonly hintKey?: string;
-  readonly options?: readonly FieldOption[];
-  readonly lookup?: string;
+  /** Editable when creating, read-only afterwards. */
+  readonly readOnlyAfterCreate?: boolean;
+  /** For `check_box`: allow a "not set" state distinct from false. */
   readonly triState?: boolean;
+  /** For `static_combo`: the declared options. */
+  readonly options?: readonly FieldOption[];
+  /** For `dynamic_combo` and `flagged_combo`: where the options come from. */
+  readonly lookup?: LookupSource;
+  /** For `spin_box`. */
   readonly min?: number;
   readonly max?: number;
-  readonly badgeKey?: string;
-  readonly readOnlyAfterCreate?: boolean;
+  /** For a field whose value is a code resolved to a pill or a flag. */
+  readonly codeDomain?: string;
+  /** For a text field with a known limit. */
   readonly maxLength?: number;
+}
+
+/**
+ * One tab of a detail screen.
+ *
+ * Not generated: which fields belong together is a domain judgement the model
+ * does not carry. This is the shape of the hand-written overlay.
+ */
+export interface FieldGroup {
+  readonly id: string;
+  /** Translation key for the tab's label. */
+  readonly titleKey: string;
+  /** Field names, in the order they appear within the group. */
+  readonly fields: readonly string[];
+}
+
+/** The per-entity bundle, so the registry has one thing to hold. */
+export interface EntityMeta {
+  readonly entity: string;
+  readonly collection: string;
+  /** The field a person recognises a record by. */
+  readonly displayField: string;
+  /** The natural key. */
+  readonly keyField: string;
+  readonly columns: readonly ColumnMeta[];
+  readonly fields: readonly FieldMeta[];
 }
 ```
 
-### 3.3 The derivation rules
+The contract is deliberately small. Everything in it is used by the shared table
+or the shared form; nothing is there for a component to read directly. If a
+generated member is not consumed by shared code, it should not be emitted.
+
+### 3.4 The derivation rules
 
 These are the rules the generator applies. Each is decidable from the model, so
 none of them is a judgement call at generation time.
@@ -308,7 +614,7 @@ fields; `version`, `modified_by`, `performed_by`, `recorded_at` and the audit pa
 belong in the columns, hidden by default, and in the read-only Provenance panel,
 which the shared code renders from the protocol type rather than from this file.
 
-### 3.4 The mappings
+### 3.5 The mappings
 
 The C++ side has these mappings already, in the Qt archetypes and in the codegen's
 own style derivation. The generator must use the same ones so the two projections
@@ -414,8 +720,11 @@ the other.
 **Deterministic.** Regenerating an unchanged model must produce a byte-identical
 file, so a regeneration with no model change shows no diff.
 
-**No imports.** The file is data. It must not import the protocol types, because
-the declaration is consumed by the registry and by tests that have no transport.
+**No runtime imports.** The file is data, and it must not import the protocol
+types, because the declaration is consumed by the registry and by tests that have
+no transport. One type-only import of `ColumnMeta` and `FieldMeta` from
+`ui-contract.ts` is expected, and is what makes the emitted file checked against
+the contract rather than merely resembling it.
 
 **Both model shapes.** The facet declares `#+model_types:` matching whatever the
 existing TypeScript facet targets, plus the entity shapes that have `Columns` and
