@@ -44,23 +44,29 @@ production. The interface repeats it in the header, permanently.
 
 ## The interface
 
-A landing page, an ordinary login form, and the account screens. The header
-carries the mark, a link to the project site, a Deployment page when the
-deployment offers it, and Sign in and Sign up.
+The landing page uses the same layout as the project site at
+orestudio.github.io, with the same artwork, the same heading and the same links
+to ORE and QuantLib, because a link from there arrives here and the two should
+not feel like different products.
+
+The header carries the mark, a link to the project site named Site, and Sign in.
+Once signed in it also offers Accounts, a Deployment page when the deployment
+has the developer surface on, and Sign out.
+
+Signing in is a username, a password and a Show toggle. Nothing else: no
+heading repeating the button, no environment notice, and no field for anything
+the deployment already knows.
 
 The environment is a small permanent marker in the footer beside the copyright,
-not a field and not a header item. It is there because the worst failure mode is
-not knowing which environment you are looking at, and it is small because it is
-not an action.
+not a field and not a header item. Small because it is not an action, permanent
+because the worst failure mode is not knowing which environment you are looking
+at.
 
-The landing page takes its palette, type scale and content column from the
-project site at orestudio.github.io, since a link from there arrives here.
-
-The Deployment page holds everything a person signing in should not have to
-think about: which environment this process serves, where it points, which file
-chose it, and what else that file declares. It is served only when the
-deployment has the developer surface switched on, because it names the host, the
-port and the namespace.
+The Deployment page is reachable only after signing in. It holds everything a
+person signing in should not have to think about: which environment this process
+serves, where it points, which file chose it, and what else that file declares.
+It is served only when the deployment has the developer surface switched on,
+because it names the host, the port and the namespace.
 
 ## Architecture
 

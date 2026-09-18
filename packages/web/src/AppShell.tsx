@@ -31,31 +31,29 @@ export function AppChrome({ children }: { readonly children: ReactNode }): React
           </Link>
 
           <nav className="ml-auto flex items-center gap-1" aria-label="Main">
-            <HeaderLink to="/about">About ORE Studio</HeaderLink>
-            {site?.developerTools === true && (
-              <HeaderLink to="/deployment">Deployment</HeaderLink>
-            )}
+            {/* A link to the project, not a page that restates it. */}
+            <HeaderLink to={PROJECT_SITE}>Site</HeaderLink>
 
             {authenticated ? (
               <>
+                {/* The deployment's plumbing is only for whoever is already
+                    inside. Before that it is none of anyone's business. */}
+                {site?.developerTools === true && (
+                  <HeaderLink to="/deployment">Deployment</HeaderLink>
+                )}
                 <HeaderLink to="/accounts">Accounts</HeaderLink>
                 <Button variant="ghost" size="sm" onClick={() => void signOut()}>
                   Sign out
                 </Button>
               </>
             ) : (
-              <>
-                <Link to="/signup">
-                  <Button variant="secondary" size="sm">
-                    Sign up
-                  </Button>
-                </Link>
-                <Link to="/login">
-                  <Button variant="primary" size="sm">
-                    Sign in
-                  </Button>
-                </Link>
-              </>
+              /* One call to action before signing in. The landing page carries
+                 the other, so the header does not need to say it too. */
+              <Link to="/login">
+                <Button variant="primary" size="sm">
+                  Sign in
+                </Button>
+              </Link>
             )}
           </nav>
         </div>

@@ -63,10 +63,11 @@ async function main(): Promise<number> {
   await screenshot(page, '30-landing');
 
   console.log('\nthe header and footer:');
-  check('About ORE Studio is a menu option', await page.isVisible('a[href="/about"]'));
-  check('the Deployment option is offered', await page.isVisible('a[href="/deployment"]'));
-  check('a sign up button is offered', await page.isVisible('a[href="/signup"]'));
+  check('the site link is offered', await page.isVisible('a[href="https://orestudio.github.io/OreStudio/"]'));
   check('a sign in button is offered', await page.isVisible('a[href="/login"]'));
+  // Before signing in, the deployment is not offered at all.
+  check('the Deployment option is not offered', (await page.locator('a[href="/deployment"]').count()) === 0);
+  check('the sign up call to action is on the page', await page.isVisible('a[href="/signup"]'));
   // The environment is a small permanent marker rather than a field, so it
   // belongs in the footer beside the copyright.
   const footer = (await page.textContent('footer')) ?? '';
@@ -74,18 +75,10 @@ async function main(): Promise<number> {
   check('the footer carries the copyright', footer.includes('©'));
   check('it marks a development environment', footer.includes('development'));
 
-  console.log('\nthe deployment page:');
+  console.log('\nthe deployment page is behind sign-in:');
   await page.goto(`${APP_URL}deployment`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('h1', { timeout: 15_000 });
-  const deployment = (await page.textContent('body')) ?? '';
-  check('it names the environment', deployment.includes('Festive Dijkstra'));
-  check('it shows where it points', deployment.includes('21805'));
-  check('it shows the namespace', deployment.includes('ores.dev.festive.dijkstra'));
-  check('it shows the configuration file', deployment.includes('environments.json'));
-  // The identifiers are the point of that table, since they are what you type
-  // on the command line.
-  check('it lists the other environments by identifier', deployment.includes('brave_hopper'));
-  await screenshot(page, '33-deployment');
+  await page.waitForSelector('input[name="username"]', { timeout: 15_000 });
+  check('it redirects to the sign-in screen', await page.isVisible('input[name="username"]'));
 
   console.log('\nnothing about connections is offered:');
   for (const gone of ['Connections', 'Import', 'Export', 'Master password', 'Quick connect']) {
@@ -145,6 +138,19 @@ async function main(): Promise<number> {
   check('the signed-in user is shown', accounts.includes(USERNAME));
   check('no credential field leaked into the page', !accounts.toLowerCase().includes('password_hash'));
   await screenshot(page, '32-accounts');
+
+  console.log('\nthe deployment page, once signed in:');
+  await page.goto(`${APP_URL}deployment`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('h1', { timeout: 15_000 });
+  const deployment = (await page.textContent('body')) ?? '';
+  check('it names the environment', deployment.includes('Festive Dijkstra'));
+  check('it shows where it points', deployment.includes('21805'));
+  check('it shows the namespace', deployment.includes('ores.dev.festive.dijkstra'));
+  check('it shows the configuration file', deployment.includes('environments.json'));
+  // The identifiers are the point of that table, since they are what you type.
+  check('it lists the other environments by identifier', deployment.includes('brave_hopper'));
+  await screenshot(page, '33-deployment');
+
 
   console.log('\nsigning out:');
   await page.click('button:has-text("Sign out")');
