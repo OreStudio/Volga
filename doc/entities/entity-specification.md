@@ -6,6 +6,10 @@ entity number one hundred is the same process as entity number one.
 Read this before writing entity code. When asked to implement an entity, this
 document is the checklist.
 
+**Where a component and its entities sit in the navigation**, and what a
+component declaration contains, is `component-specification.md`. This document
+covers the screens themselves.
+
 **What this document is.** It is derived from the Qt client, which already
 carries the accumulated decisions, but it is not a transcription of it. The Qt
 client contains two archetypes and one is better than the other. Where they
@@ -749,6 +753,8 @@ Derived from the Qt client. The documents worth reading alongside this one:
 - `projects/modeling/qt_facet.org` - the generated facet and its templates
 - `projects/modeling/entity_lifecycle.org` - the complete per-entity file
   inventory across every layer
+- `doc/entities/component-specification.md` - how a component is declared and
+  where its screens sit
 - `doc/entities/icon-reference.md` - the icon vocabulary, in this repository
 - `doc/knowledge/ui/icon_guidelines.org` - the source catalogue, in the C++ checkout
 - `projects/ores.qt/api/include/ores.qt/ColumnMetadata.hpp` - the column styles

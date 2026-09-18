@@ -8,25 +8,19 @@ does not happen: the table below is the whole vocabulary, and adding to it is a
 process with a checklist rather than a decision made at a call site.
 
 Derived from the Qt client's `doc/knowledge/ui/icon_guidelines.org`, which is the
-source of truth for the artwork itself.
+source of truth for the artwork itself. Used by
+`entity-specification.md` and `component-specification.md`.
 
 ---
 
 ## 1. The system
 
-Two icon sets, both already vendored in the C++ checkout:
+One icon set: **Microsoft Fluent UI System Icons**. The Qt client also carries a
+Solar set as an alternate theme; this interface does not, because supporting two
+sets doubles the vocabulary for no gain. Fluent only.
 
-| Set | Variants | Intended style |
-|---|---|---|
-| **Fluent UI System Icons** | Regular, Filled | The default |
-| **Solar Icons** | Linear, Bold | An alternative theme |
-
-Fluent is the default theme. Solar exists as a second theme, so every icon needs a
-counterpart in both sets. In practice Fluent is what ships and Solar is the
-alternative.
-
-**Naming.** Fluent icons are `ic_fluent_{concept}_{size}_{variant}.svg`. Sizes are
-16, 20, 32 and 48. Variants are `regular` and `filled`.
+**Naming.** Icons are `ic_fluent_{concept}_{size}_{variant}.svg`. Sizes are 16,
+20, 32 and 48. Variants are `regular` and `filled`.
 
 **Sizes.**
 
@@ -58,10 +52,12 @@ An `Icon` enum in `IconUtils.hpp` lists every concept, alphabetically. A
 case Icon::Publish: return {"ic_fluent_arrow_upload_20", "upload-square.svg"};
 ```
 
-The first string is the Fluent base name without the variant suffix. The second is
-the Solar filename. An optional third parameter forces the filled variant.
+The first string is the Fluent base name without the variant suffix; the second is
+the Solar counterpart, which this interface does not use. The enum is the
+vocabulary and the mapping is how a concept becomes a file.
 
-The enum is the vocabulary; the mapping is how a concept becomes a file.
+In the port there is no resource file and no second set, so one table in the icon
+module replaces both.
 
 ---
 
@@ -200,7 +196,8 @@ artwork, the mapping, and the documentation are updated together.
 **In the Qt client:**
 
 1. Find a semantically appropriate icon in both sets, both variants.
-2. Copy it into the Fluent and Solar directories.
+2. Copy it into the Fluent directories, both variants. (In the Qt client,
+   also the Solar directories; this interface uses Fluent only.)
 3. Add it to `resources.qrc`.
 4. Add an entry to the `Icon` enum, alphabetically.
 5. Add the mapping in `getIconDef()`.
