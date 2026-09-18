@@ -224,6 +224,12 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
         }}
         image={{
           imageId: String(values['image_id'] ?? ''),
+          /*
+           * Flags are not tagged by kind, but they follow a convention: the
+           * description reads "Flag of xx" and the key is the country code. That
+           * is enough to keep a flag picker from offering a staff photograph.
+           */
+          filter: 'flag of',
           onPick: (chosen) => change('image_id', chosen ?? ''),
         }}
         onDelete={() => setStage('delete')}

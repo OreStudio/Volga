@@ -37,6 +37,9 @@ export interface EntityDetailPageProps {
    */
   readonly image?: {
     readonly imageId: string | undefined;
+    /** What to narrow the choices to, when the entity's images share a
+     *  convention the picker can match on. */
+    readonly filter?: string;
     readonly onPick: (imageId: string | null) => void;
   };
   readonly validationErrors?: Readonly<Record<string, string>>;
@@ -153,7 +156,12 @@ export function EntityDetailPage({
       )}
 
       {image !== undefined && (
-        <FlagEditor imageId={image.imageId} editable={editable} onPick={image.onPick} />
+        <FlagEditor
+          imageId={image.imageId}
+          editable={editable}
+          {...(image.filter === undefined ? {} : { filter: image.filter })}
+          onPick={image.onPick}
+        />
       )}
 
       <div className="mb-5 flex flex-wrap gap-1 border-b border-line" role="tablist">

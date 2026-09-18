@@ -44,10 +44,19 @@ function useImages(enabled: boolean): ReturnType<typeof useQuery<readonly ImageI
 export function FlagEditor({
   imageId,
   editable,
+  filter,
   onPick,
 }: {
   readonly imageId: string | undefined;
   readonly editable: boolean;
+  /**
+   * What to narrow the choices to.
+   *
+   * The images are not tagged by kind, but the flags follow a convention: the key
+   * is the country code and the description reads "Flag of xx". Matching on that
+   * is what keeps a flag picker from offering a staff photograph.
+   */
+  readonly filter?: string;
   readonly onPick: (imageId: string | null) => void;
 }): ReactNode {
   const { t } = useTranslation();
@@ -56,9 +65,22 @@ export function FlagEditor({
 
   return (
     <div className="mb-5 flex items-center gap-3">
-      <span
+      {/*
+        The image is the button.
+        
+        A separate "change image" control is a second thing to find for an act
+        that only applies to the image, and it leaves the image itself looking
+        like decoration. Clicking the picture to change the picture is what
+        anybody tries first.
+      */}
+      <button
+        type="button"
+        disabled={!editable}
+        onClick={() => setPicking(true)}
+        title={editable ? (hasImage ? t('image.change') : t('image.choose')) : undefined}
         className={cx(
           'grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-bg-secondary',
+          editable && 'cursor-pointer hover:border-line-strong hover:bg-surface-overlay',
         )}
       >
         {hasImage ? (
@@ -69,29 +91,23 @@ export function FlagEditor({
           />
         ) : (
           // Not an empty box with no explanation: a record without an image says
-          // that it has none.
+          // that it has none, and that it can be given one.
           <span className="px-1 text-center text-[10px] leading-tight text-ink-faint">
-            {t('image.none')}
+            {editable ? t('image.choose') : t('image.none')}
           </span>
         )}
-      </span>
+      </button>
 
-      {editable && (
-        <span className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>
-            {hasImage ? t('image.change') : t('image.choose')}
-          </Button>
-          {hasImage && (
-            <Button variant="ghost" size="sm" onClick={() => onPick(null)}>
-              {t('image.remove')}
-            </Button>
-          )}
-        </span>
+      {editable && hasImage && (
+        <Button variant="ghost" size="sm" onClick={() => onPick(null)}>
+          {t('image.remove')}
+        </Button>
       )}
 
       {picking && (
         <FlagPicker
           current={imageId}
+          {...(filter === undefined ? {} : { filter })}
           onPick={(chosen) => {
             onPick(chosen);
             setPicking(false);
@@ -106,10 +122,12 @@ export function FlagEditor({
 /** The images to choose from, as a grid. */
 function FlagPicker({
   current,
+  filter,
   onPick,
   onClose,
 }: {
   readonly current: string | undefined;
+  readonly filter?: string;
   readonly onPick: (imageId: string | null) => void;
   readonly onClose: () => void;
 }): ReactNode {
@@ -118,9 +136,10 @@ function FlagPicker({
   const query = useImages(true);
 
   const images = (query.data ?? []).filter((image) => {
+    const haystack = `${image.key} ${image.description}`.toLowerCase();
+    if (filter !== undefined && !haystack.includes(filter.toLowerCase())) return false;
     const needle = search.trim().toLowerCase();
-    if (needle.length === 0) return true;
-    return `${image.key} ${image.description}`.toLowerCase().includes(needle);
+    return needle.length === 0 || haystack.includes(needle);
   });
 
   return (
