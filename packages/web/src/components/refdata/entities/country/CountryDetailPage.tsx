@@ -6,7 +6,7 @@ import {
   ChangeReasonDialog,
   type ChangeReasonResult,
 } from '../../../../entity/ChangeReasonDialog.js';
-import { countryMeta } from './country_ui.js';
+import { countryMeta } from '../../../../generated/refdata/ui/country_ui.js';
 import { countryFieldGroups } from './country_field_groups.js';
 import { useCountries, useDeleteCountry, useSaveCountry } from '../../../../api/countries.js';
 import { useChangeReasons } from '../../../../api/changeReasons.js';

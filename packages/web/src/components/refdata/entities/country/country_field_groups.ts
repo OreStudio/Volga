@@ -1,4 +1,4 @@
-import type { FieldGroup } from '../../../../entity/contract.js';
+import type { FieldGroup } from '../../../../generated/ui-contract.js';
 
 /**
  * How a country's fields are grouped into tabs.

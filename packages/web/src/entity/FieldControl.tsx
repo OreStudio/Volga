@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from '../i18n/Provider.js';
 import { cx } from '../ui/Primitives.js';
-import type { FieldMeta } from './contract.js';
+import type { FieldMeta } from '../generated/ui-contract.js';
 
 /**
  * One form control, chosen by the field's declaration.

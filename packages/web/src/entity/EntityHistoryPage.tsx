@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from '../i18n/Provider.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Notice, cx } from '../ui/Primitives.js';
-import type { ColumnMeta, EntityMeta } from './contract.js';
+import type { ColumnMeta, EntityMeta } from '../generated/ui-contract.js';
 
 /**
  * The version history of one record.

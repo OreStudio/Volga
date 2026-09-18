@@ -8,7 +8,7 @@ import {
 } from '../../../../entity/ChangeReasonDialog.js';
 import { useCountries, useDeleteCountry, type CountryRow } from '../../../../api/countries.js';
 import { useChangeReasons } from '../../../../api/changeReasons.js';
-import { countryMeta } from './country_ui.js';
+import { countryMeta } from '../../../../generated/refdata/ui/country_ui.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
 
 /**

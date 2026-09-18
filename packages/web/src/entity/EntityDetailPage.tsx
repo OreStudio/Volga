@@ -3,7 +3,7 @@ import { FieldControl } from './FieldControl.js';
 import { useTranslation } from '../i18n/Provider.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
-import type { EntityMeta, FieldGroup } from './contract.js';
+import type { EntityMeta, FieldGroup } from '../generated/ui-contract.js';
 
 /**
  * The detail screen for every entity.

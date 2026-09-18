@@ -4,7 +4,7 @@ import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { useTranslation } from '../i18n/Provider.js';
-import type { EntityMeta } from './contract.js';
+import type { EntityMeta } from '../generated/ui-contract.js';
 
 /**
  * The list screen for every entity.

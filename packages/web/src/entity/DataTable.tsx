@@ -3,7 +3,7 @@ import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import type { IconName } from '../ui/icons/index.js';
 import { useTranslation } from '../i18n/Provider.js';
 import { cx } from '../ui/Primitives.js';
-import type { ColumnMeta, ColumnStyle } from './contract.js';
+import type { ColumnMeta, ColumnStyle } from '../generated/ui-contract.js';
 
 /**
  * A table driven by a column declaration.

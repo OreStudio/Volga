@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { EntityHistoryPage, type HistoryVersion } from '../../../../entity/EntityHistoryPage.js';
-import { countryMeta } from './country_ui.js';
+import { countryMeta } from '../../../../generated/refdata/ui/country_ui.js';
 import { useCountryHistory } from '../../../../api/countries.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
 
