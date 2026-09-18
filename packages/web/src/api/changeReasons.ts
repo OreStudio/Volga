@@ -74,7 +74,17 @@ export function reasonsFor(
   return reasons
     .filter(applies)
     .filter((reason) => {
-      if (operation === 'create') return true;
+      /*
+       * The diff decides which reasons apply to an amendment, and only to an
+       * amendment.
+       *
+       * "Nothing material changed" is a statement about an edit, so it is not a
+       * reason to delete anything, and the service does not offer it for a
+       * delete. Applying the rule to a delete therefore offered *no* reasons at
+       * all, and the dialog rendered empty. A create is unaffected for the same
+       * reason: nothing has changed yet.
+       */
+      if (operation !== 'amend') return true;
       const isNonMaterial = reason.code === NON_MATERIAL_REASON;
       return hasChanges ? !isNonMaterial : isNonMaterial;
     })

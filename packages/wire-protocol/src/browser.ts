@@ -49,6 +49,8 @@ export type {
 } from './contracts.js';
 
 export {
+  applyEdit,
+  newCountry,
   countryPageSchema,
   listCountriesRequestSchema,
   wireCountrySchema,

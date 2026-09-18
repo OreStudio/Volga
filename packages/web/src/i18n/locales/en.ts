@@ -295,6 +295,7 @@ export const en: SourceCatalogue = {
   table: {
     chooseColumns: 'Choose columns',
     rowActions: 'Actions',
+    searchedSoFar: 'Searched the first {shown} of {total}',
   },
   history: {
     description: 'Every version of this record, newest first.',

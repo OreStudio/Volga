@@ -286,6 +286,7 @@ const fr: SourceCatalogue = {
   table: {
     chooseColumns: 'Choisir les colonnes',
     rowActions: 'Actions',
+    searchedSoFar: 'Recherche sur les {shown} premiers sur {total}',
   },
   history: {
     description: 'Toutes les versions de cet enregistrement, la plus récente en premier.',

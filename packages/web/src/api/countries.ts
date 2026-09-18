@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { request } from './transport.js';
-import type { WireCountry } from '@volga/protocol';
+import { wireCountrySchema, type WireCountry } from '@volga/protocol/browser';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
@@ -26,6 +26,13 @@ const countrySchema = z.object({
   performedBy: z.string(),
   /** The flag image, when the record carries one. */
   imageId: z.string().nullable(),
+  /**
+   * The record as the service sent it.
+   *
+   * Validated rather than assumed, because it is what an amend sends back: a
+   * field silently lost here is a field silently cleared on the next save.
+   */
+  wire: wireCountrySchema,
 });
 
 export type Country = z.infer<typeof countrySchema>;
@@ -55,6 +62,15 @@ export function toRow(country: Country): CountryRow {
     // The record's identity, which for this entity is its natural key.
     id: country.alpha2Code,
     image_id: country.imageId,
+    /*
+     * The record as the service sent it, carried through to the screen.
+     *
+     * A save replaces the whole record, and the form has no business knowing the
+     * fields it does not show. Round-tripping the original is what stops an amend
+     * quietly dropping one, and dropping it here is why the detail form was
+     * rendering empty for a record that had loaded.
+     */
+    wire: country.wire,
   };
 }
 

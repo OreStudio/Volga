@@ -51,8 +51,27 @@ export function EntityHistoryPage({
   const [selected, setSelected] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
-  const older = versions[selected + 1];
-  const newer = versions[selected];
+  /*
+   * One row per version.
+   *
+   * A version is the identity of a history entry, so two entries with the same
+   * version are the same entry appearing twice. The service can return that —
+   * duplicate rows for one version exist in this data — and rendering them twice
+   * shows a person a change that did not happen. Kept rather than hidden: if two
+   * differ, the first is the one shown, and the duplication itself is a data
+   * problem to fix at the source.
+   */
+  const entries = useMemo(() => {
+    const seen = new Set<number>();
+    return versions.filter((version) => {
+      if (seen.has(version.version)) return false;
+      seen.add(version.version);
+      return true;
+    });
+  }, [versions]);
+
+  const older = entries[selected + 1];
+  const newer = entries[selected];
 
   const rows = useMemo(
     () => (older === undefined || newer === undefined ? [] : diff(older, newer, meta.columns)),
@@ -82,14 +101,14 @@ export function EntityHistoryPage({
 
       {loading ? (
         <p className="text-sm text-ink-faint">{t('entity.loading')}</p>
-      ) : versions.length === 0 ? (
+      ) : entries.length === 0 ? (
         <p className="text-sm text-ink-muted">{t('history.empty')}</p>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(220px,300px)_1fr]">
           <section>
             <h2 className="mb-2 text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
             <ol className="space-y-1.5">
-              {versions.map((version, index) => (
+              {entries.map((version, index) => (
                 <li key={version.version}>
                   <button
                     type="button"

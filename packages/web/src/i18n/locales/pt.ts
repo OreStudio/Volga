@@ -291,6 +291,7 @@ const pt: SourceCatalogue = {
   table: {
     chooseColumns: 'Escolher colunas',
     rowActions: 'Ações',
+    searchedSoFar: 'Pesquisados os primeiros {shown} de {total}',
   },
   history: {
     description: 'Todas as versões deste registo, da mais recente para a mais antiga.',

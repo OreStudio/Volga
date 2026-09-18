@@ -32,7 +32,14 @@ export function FieldControl({
 }: FieldControlProps): ReactNode {
   const { t } = useTranslation();
   const label = t(field.labelKey);
-  const readOnly = disabled || field.readOnlyAfterCreate === true;
+  /*
+   * Read-only is decided by the screen, not by the field.
+   *
+   * `readOnlyAfterCreate` is a property of the entity, not of this render: the
+   * same field is editable when creating and fixed afterwards. Reading it here
+   * made a key field uneditable in the one mode where it must be typed.
+   */
+  const readOnly = disabled;
   const describedBy = error === undefined ? undefined : `${field.name}-error`;
 
   return (

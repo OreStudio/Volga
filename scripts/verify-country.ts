@@ -62,11 +62,28 @@ mkdirSync(SHOTS, { recursive: true });
 
 const consoleErrors: string[] = [];
 page.on('pageerror', (error) => consoleErrors.push(String(error)));
+
+/*
+ * A refused request is only an error if it was not expected.
+ *
+ * Reading the console text is not enough, because the text of a failed resource
+ * carries no URL. So the expected refusal is recognised where the URL is known —
+ * the session probe before sign-in — and everything else that fails is reported
+ * with its URL, which is what makes a failure actionable.
+ */
+const expectedRefusals = ['/api/session'];
+const failedRequests: string[] = [];
+page.on('response', (response) => {
+  if (response.status() < 400) return;
+  const url = response.url();
+  if (expectedRefusals.some((path) => url.includes(path))) return;
+  failedRequests.push(`${response.status()} ${url}`);
+});
 page.on('console', (message) => {
   if (message.type() !== 'error') return;
   const text = message.text();
-  // The session probe before sign-in is expected to be refused.
-  if (text.includes('/api/session')) return;
+  // Resource failures are reported from the response listener, with the URL.
+  if (text.includes('Failed to load resource')) return;
   consoleErrors.push(text);
 });
 
@@ -167,15 +184,76 @@ try {
     await page.fill('input#official_name', 'The Verification Republic');
     await page.locator('button', { hasText: /^Save$/ }).first().click();
     await page.waitForTimeout(800);
-    const reasonDialog = await page.locator('[role="listbox"][aria-label]').count();
-    check('saving prompts for a reason', reasonDialog > 0);
+
+    // The audit prompt, and the commit button whose label follows the operation.
+    const reasons = page.locator('[role="listbox"] button[role="option"]');
+    check('saving prompts for a reason', (await reasons.count()) > 0, `${await reasons.count()} reasons`);
     await shot(page, '75-country-create-reason');
+
+    await reasons.first().click();
+    await page.locator('[role="dialog"] button', { hasText: /^Create$/ }).click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(800);
+
+    // The record should now exist and the screen should be showing it.
+    const created = ((await page.textContent('h1')) ?? '').trim();
+    check('the record is created', created.includes('Verification Land'), created);
+    await shot(page, '76-country-created');
+
+    // Amend it, which is a different write path and a different reason set.
+    await page.locator('button', { hasText: /^Edit$/ }).first().click();
+    await page.waitForTimeout(600);
+    await page.fill('input#name', 'Verification Land amended');
+    await page.locator('button', { hasText: /^Save$/ }).first().click();
+    await page.waitForTimeout(800);
+    const amendReasons = page.locator('[role="listbox"] button[role="option"]');
+    check('amending prompts for a reason', (await amendReasons.count()) > 0);
+    await amendReasons.first().click();
+    await page.locator('[role="dialog"] button', { hasText: /^Save$/ }).click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(800);
+    await page
+      .locator('h1', { hasText: 'amended' })
+      .waitFor({ timeout: 15_000 })
+      .catch(() => undefined);
+    const amended = ((await page.textContent('h1')) ?? '').trim();
+    check('the amendment is saved', amended.includes('amended'), amended);
+
+    // The history should hold both versions.
+    await page.goto(`${APP}refdata/country/XQ/history`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    const versions = await page.locator('ol li').count();
+    check('the history holds both versions', versions >= 2, `${versions} versions`);
+    await shot(page, '77-country-history-written');
+
+    // Delete it, so the verification leaves the system as it found it.
+    await page.goto(`${APP}refdata/country/XQ/edit`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await page.locator('button[title="Delete"]').first().click();
+    await page.waitForTimeout(600);
+    await page.locator('[role="dialog"] button', { hasText: /^Delete$/ }).click();
+    await page.waitForTimeout(1200);
+    await shot(page, '78-delete-reason');
+    const deleteReasons = page.locator('[role="listbox"] button[role="option"]');
+    const dialogLabel = await page.locator('[role="dialog"]').first().getAttribute('aria-label').catch(() => null);
+    check('deleting prompts for a reason', (await deleteReasons.count()) > 0, `dialog="${dialogLabel}"`);
+    await deleteReasons.first().click();
+    await page.locator('[role="dialog"] button', { hasText: /^Confirm Delete$/ }).click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(800);
+
+    await page.goto(`${APP}refdata/country`, { waitUntil: 'networkidle' });
+    await page.waitForSelector('tbody tr', { timeout: 20_000 });
+    const body = (await page.textContent('body')) ?? '';
+    check('the record is gone, leaving the system as found', !body.includes('Verification Land'));
+    await shot(page, '78-country-deleted');
   } else {
     console.log('\nthe write path: skipped (pass --write to exercise it, which needs a provisioned account)');
   }
 
   console.log('\nbrowser console:');
-  check('no unexpected console error was logged', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));
+  check('no uncaught exception was thrown', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));
+  check('every request succeeded', failedRequests.length === 0, failedRequests.slice(0, 3).join(' | '));
 } finally {
   await browser.close();
 }

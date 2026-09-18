@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
@@ -121,6 +121,27 @@ export function EntityListPage<Row extends Record<string, unknown>>({
         ]),
   ];
 
+  /*
+   * Search has to reach the whole collection, not the page on screen.
+   *
+   * The service's list takes paging and no predicate, so filtering happens here,
+   * over whatever has been loaded. That is fine while the whole collection fits
+   * in one page and badly wrong as soon as it does not: searching for a record on
+   * page four returns "no results" while the record exists, which is worse than
+   * having no search at all.
+   *
+   * So a search asks for everything, once, when the collection is small enough to
+   * hold. Above the ceiling the count says what was searched, because a person
+   * can act on a stated limit but not on a silent one.
+   */
+  const searching = search.trim().length > 0;
+  const wholeCollectionLoaded = rows.length >= totalCount;
+  useEffect(() => {
+    if (!searching || wholeCollectionLoaded) return;
+    if (totalCount > LOAD_ALL_CEILING || totalCount === 0) return;
+    onPageSizeChange(totalCount);
+  }, [searching, wholeCollectionLoaded, totalCount, onPageSizeChange]);
+
   const pages = Math.max(1, Math.ceil(totalCount / pageSize));
   const loading = query.isPending;
   const isFiltered = search.trim().length > 0 || filter.length > 0;
@@ -201,9 +222,11 @@ export function EntityListPage<Row extends Record<string, unknown>>({
         )}
 
         <span className="ml-auto text-xs tabular-nums text-ink-faint">
-          {isFiltered
-            ? t('accounts.count', { shown: visible.length, total: rows.length })
-            : plural('home.entities', totalCount)}
+          {searching && !wholeCollectionLoaded && totalCount > LOAD_ALL_CEILING
+            ? t('table.searchedSoFar', { shown: rows.length, total: totalCount })
+            : isFiltered
+              ? t('accounts.count', { shown: visible.length, total: rows.length })
+              : plural('home.entities', totalCount)}
         </span>
       </div>
 

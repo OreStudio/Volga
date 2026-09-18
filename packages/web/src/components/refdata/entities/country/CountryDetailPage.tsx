@@ -11,7 +11,7 @@ import { countryFieldGroups } from './country_field_groups.js';
 import { useCountries, useDeleteCountry, useSaveCountry } from '../../../../api/countries.js';
 import { useChangeReasons } from '../../../../api/changeReasons.js';
 import { useTranslation } from '../../../../i18n/Provider.js';
-import { applyEdit, newCountry, type WireCountry } from '@volga/protocol';
+import { applyEdit, newCountry, type WireCountry } from '@volga/protocol/browser';
 
 /**
  * One country: reading it, amending it, or creating it.
@@ -63,11 +63,20 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [stage, setStage] = useState<'reason' | 'delete' | 'delete-reason' | undefined>(undefined);
 
-  // Seed from the record once it arrives. Guarded by `touched` so a late fetch
-  // cannot overwrite what somebody has already typed.
+  /*
+   * Seed from the record as it arrives.
+   *
+   * Keyed on the version as well as the identity, because a save produces a new
+   * version of the same record and the form has to follow it. Keying on identity
+   * alone left the screen showing the values from before the save, which reads as
+   * a save that did not happen.
+   *
+   * Guarded by `touched` so a fetch cannot overwrite what somebody has typed.
+   */
+  const seedKey = current === undefined ? undefined : `${String(id)}:${wire?.version ?? 0}`;
   const [seeded, setSeeded] = useState<string | undefined>(undefined);
-  if (!touched && current !== undefined && seeded !== id) {
-    setSeeded(id);
+  if (!touched && seedKey !== undefined && seeded !== seedKey) {
+    setSeeded(seedKey);
     setValues(recordFrom(wire));
   }
 

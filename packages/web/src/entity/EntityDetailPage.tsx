@@ -210,15 +210,19 @@ export function EntityDetailPage({
           {(group?.fields ?? []).map((name) => {
             const field = meta.fields.find((f) => f.name === name);
             if (field === undefined) return null;
-            // The key is fixed once the record exists: the username, the code,
-            // the natural key. Changing it would change what the record is.
-            const locked = field.isKey && mode !== 'create';
+            /*
+             * A key is typed when creating and fixed afterwards: the username,
+             * the code, the natural key. Changing it later would change what the
+             * record is, which is why the declaration says so and the mode
+             * decides when.
+             */
+            const locked = (field.isKey || field.readOnlyAfterCreate === true) && mode !== 'create';
             return (
               <FieldControl
                 key={name}
-                field={locked ? { ...field, readOnlyAfterCreate: true } : field}
+                field={field}
                 value={values[name]}
-                disabled={!editable}
+                disabled={!editable || locked}
                 onChange={onChange}
                 {...(validationErrors?.[name] === undefined
                   ? {}
