@@ -509,10 +509,12 @@ secondary actions, filled for active and primary. Sizes are 16px inline and in
 dense tables, 20px in buttons and navigation, 32px in headers, 48px for empty
 states. The application recolours icons to `rgb(220, 220, 220)` by default.
 
-This table is normative. When an entity needs an action that is not listed, find
-the concept in the icon guidelines and add it here rather than choosing freely at
-the call site, because two entities using different icons for one idea is the
-inconsistency this document exists to prevent.
+**The full vocabulary is in `icon-reference.md`**, which lists all eighty concepts
+in twelve categories with their file names, and the process for adding one. The table below is the entity-facing subset: what an entity screen needs.
+Use it, and when an entity needs an action it does not list, add the concept to
+both tables rather than choosing freely at the call site. Two entities using
+different icons for one idea is the inconsistency these documents exist to
+prevent.
 
 ### Actions
 
@@ -747,7 +749,8 @@ Derived from the Qt client. The documents worth reading alongside this one:
 - `projects/modeling/qt_facet.org` - the generated facet and its templates
 - `projects/modeling/entity_lifecycle.org` - the complete per-entity file
   inventory across every layer
-- `doc/knowledge/ui/icon_guidelines.org` - the icon catalogue and naming rules
+- `doc/entities/icon-reference.md` - the icon vocabulary, in this repository
+- `doc/knowledge/ui/icon_guidelines.org` - the source catalogue, in the C++ checkout
 - `projects/ores.qt/api/include/ores.qt/ColumnMetadata.hpp` - the column styles
 - `projects/ores.qt/api/include/ores.qt/EntityListMdiWindow.hpp` - the list
   window contract
