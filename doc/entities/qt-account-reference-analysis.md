@@ -1,3 +1,16 @@
+# Qt account screen: raw reference analysis
+
+This is the working analysis behind `entity-specification.md`, kept because it
+carries the exact file and line citations that the specification deliberately
+leaves out. Read the specification for the rules; come here to see where a rule
+came from, or to check one against the Qt source.
+
+It was produced by reading the C++ checkout and is a description of what is
+there, defects included. The specification is the one that decides what to
+build.
+
+---
+
 # Standard CRUD Entity Detail Dialog — Exact Specification (account as reference)
 
 Source tree: `/mnt/development/OreStudio/ores_dev_festive_dijkstra` (read-only; nothing modified).

@@ -3,9 +3,33 @@
 What it means to be an entity in this interface, written so that implementing
 entity number one hundred is the same process as entity number one.
 
-Read this before writing any entity code. When asked to implement an entity,
-this document is the checklist, and the answer to "what should this screen do"
-is in here rather than in a decision made again each time.
+Read this before writing entity code. When asked to implement an entity, this
+document is the checklist.
+
+**What this document is.** It is derived from the Qt client, which already
+carries the accumulated decisions, but it is not a transcription of it. The Qt
+client contains two archetypes and one is better than the other. Where they
+disagree this document states the rule and names the divergence, so that "what
+should this screen do" has one answer rather than two.
+
+---
+
+## 0. Two archetypes, and which one is the standard
+
+**The generated standard.** Produced by codegen from the entity's `.org` model
+into `Client<Entity>Model` and `<Entity>MdiWindow`. This is the pattern that
+repeats for hundreds of entities: single selection, a standard toolbar, one tab
+per field group, and a change reason prompted on every create, amend and delete.
+`ClientCountryModel` and `CountryMdiWindow` are the reference.
+
+**The legacy hand-written screens.** `AccountMdiWindow`, `ClientAccountModel`,
+`AccountDetailDialog`. Older, richer in places, inconsistent in ways that matter.
+Multi-selection, a per-entity delegate, no column metadata, six bespoke tabs.
+
+The accounts screen is the one the request named, and it is a good reference for
+**what an entity screen contains**. It is not the standard for **how it behaves**,
+because it deviates in specific and important ways listed in section 13. This
+document follows the generated standard where they disagree.
 
 ---
 
@@ -15,108 +39,109 @@ Fixed terms, used consistently in code, in the interface, and in conversation.
 
 | Term | Meaning |
 |---|---|
-| **Entity** | A domain record with identity, a version history, and an audit trail. Accounts, books, currencies, parties. |
-| **Collection** | The plural noun for the set. The entity is `book`, the collection is `books`. |
-| **List screen** | The table of an entity's records with its toolbar and paging. |
-| **Detail screen** | The form for reading, creating, editing and deleting one record. |
-| **History screen** | The read-only list of every version of one record. |
-| **Reference data** | A short, stable set that other entities point at. Currencies, countries, business centres. |
-| **Transactional data** | Records that accumulate and are rarely edited. Trades, sessions, samples. |
-| **Lookup entity** | A reference-data entity whose code is natural and memorable, such as `GBP`. |
-| **Child entity** | A record that only exists within a parent. An account's contact details. |
-| **Junction entity** | A record joining two entities, such as account to party. |
-| **Temporal** | A record carrying validity dates, so the past can be reconstructed. |
-| **Audit fields** | The who and why of a change: reason code, commentary, and the actors. |
-| **Provenance** | What wrote the record and when: version, recorded time, source. |
+| **Entity** | A domain record with identity, a version history, and an audit trail |
+| **Collection** | The plural noun. The entity is `book`, the collection is `books` |
+| **List screen** | The table of an entity's records with its toolbar and paging |
+| **Detail screen** | The form for reading, creating, editing and deleting one record |
+| **History screen** | The read-only list of every version of one record |
+| **Reference data** | A short, stable set that other entities point at |
+| **Transactional data** | Records that accumulate and are rarely edited |
+| **Lookup entity** | A reference-data entity with a natural code, such as `GBP` |
+| **Child entity** | A record that exists only within a parent |
+| **Junction entity** | A record joining two entities |
+| **Temporal** | A record carrying validity dates, so the past can be reconstructed |
+| **Audit fields** | The who and why: reason code, commentary, and the actors |
+| **Provenance** | What wrote the record and when: version, recorded time, source |
+| **Field group** | A named set of fields that becomes one tab or one section |
 
-Naming in code follows the table in §11. Never invent a synonym.
+Naming in code follows section 12. Never invent a synonym.
 
 ---
 
 ## 2. What makes a record an entity
 
-An entity is a record that has all six of these. If it lacks one, it is not a
-regular entity and needs a deliberate exception rather than a shortcut.
+An entity has all six of these. If it lacks one it is not a regular entity and
+needs a deliberate exception rather than a shortcut.
 
 1. **Identity.** A stable primary key, almost always a UUID. The key never
-   changes.
-2. **A display name.** One field that a person recognises the record by, unique
-   within its scope. The username, the book code, the currency code.
-3. **A version.** An integer that increments on every accepted change, used for
+   changes. Some lookup entities key on a short natural code instead.
+2. **A display name.** The field a person recognises the record by, unique
+   within its scope.
+3. **A version.** An integer incremented on every accepted change, used for
    optimistic locking.
 4. **An audit trail.** Who made the change and why, on every accepted write.
-5. **Tenancy.** A tenant identifier, even when only one tenant exists, so the
+5. **Tenancy.** A tenant identifier, even where only one tenant exists, so the
    scoping rule is uniform.
-6. **A lifecycle.** Created, read, amended, deleted. Deletion is soft where the
-   record is referenced by anything else.
+6. **A lifecycle.** Created, read, amended, deleted. Deletion is soft where
+   anything references the record.
 
 ### Properties every entity carries
 
 | Property | Type | Purpose |
 |---|---|---|
-| `id` | UUID | Identity. |
-| `version` | integer | Optimistic locking. Increments per accepted write. |
-| `tenant_id` | UUID | Tenancy scope. |
-| `change_reason_code` | string | Why the change happened. References the change-reason lookup. |
-| `change_commentary` | string | Free text, may be empty. |
-| `modified_by` | string | The account whose change produced this version. |
-| `performed_by` | string | The account that asked for it. Differs from `modified_by` only when a service acts on a person's behalf. |
-| `recorded_at` | timestamp | When this version was written. |
+| `id` | UUID | Identity |
+| `version` | integer | Optimistic locking. Increments per accepted write |
+| `tenant_id` | UUID | Tenancy scope |
+| `change_reason_code` | string | Why the change happened |
+| `change_commentary` | string | Free text, may be empty |
+| `modified_by` | string | The account whose change produced this version |
+| `performed_by` | string | The account that asked for it. Differs from `modified_by` when a service acts for a person |
+| `recorded_at` | timestamp | When this version was written |
 
 ### Properties some entities carry
 
 | Property | When |
 |---|---|
-| `valid_from`, `valid_to` | Temporal entities. A version's own validity window. |
-| `folder_id` or a parent reference | Entities organised in a hierarchy |
+| `valid_from`, `valid_to` | Temporal entities |
+| A parent reference | Entities in a hierarchy |
 | `image_id` | Entities that show a picture |
-| `status` | Entities with a lifecycle beyond existing or not |
+| A natural code | Lookup entities |
+| A status | Entities with a lifecycle beyond existing |
 
 ---
 
 ## 3. The layers
 
-Five layers, each with one job. Every entity has all five, and nothing is
-skipped because an entity "is simple".
+Five layers, each with one job. Every entity has all five.
 
 ```
-  ┌─────────────────────────────────────────────────────┐
-  │  Screen        list, detail, history                │  React
-  │  ─────────────────────────────────────────────────  │
-  │  Query         server state, cache, mutations       │  React Query
-  │  ─────────────────────────────────────────────────  │
-  │  Endpoint      HTTP, validated at the boundary      │  BFF
-  │  ─────────────────────────────────────────────────  │
-  │  Protocol      subjects, request and reply shapes   │  @volga/protocol
-  └─────────────────────────────────────────────────────┘
+  Screen        list, detail, history                React
+  Query         server state, cache, mutations       React Query
+  Endpoint      HTTP, validated at the boundary      BFF
+  Protocol      subjects, request and reply shapes   @volga/protocol
 ```
 
 **Screen.** Presentation only. No fetching, no business rules, no knowledge of
-subjects or field names.
+subjects or wire field names.
 
-**Query.** One hook per read, one mutation per write. Owns caching, invalidation
-and the loading and error states each screen renders.
+**Query.** One hook per read, one mutation per write. Owns caching,
+invalidation, and the loading and error states the screen renders.
 
 **Endpoint.** Validates input, calls the protocol layer, maps failures to status
-codes. Knows the protocol; the screen never does.
+codes. The only layer above the protocol that knows anything about it.
 
-**Protocol.** The subjects, the request and reply schemas, and the wire encoding.
-This is the only layer that knows a wire field name.
+**Protocol.** Subjects, request and reply schemas, wire encoding. The only layer
+that knows a wire field name.
+
+The Qt client reached the same conclusion with the same shape: the four-layer
+stack of controller, list window, detail dialog and client model, documented in
+its own `entity_controller_pattern.org`. The layers differ in language, not in
+responsibility.
 
 ### What that buys
 
 Adding an entity touches the protocol for its operations, the endpoint for its
 routes, and the screens. It never touches another entity's code. If adding an
-entity requires editing shared, unrelated code, the shared code is missing an
-abstraction and that is the bug to fix first.
+entity requires editing shared, unrelated code, that shared code is missing an
+abstraction and fixing it is the first task.
 
 ---
 
-## 4. The four screens
+## 4. The screens
 
 | Screen | Route | Purpose |
 |---|---|---|
-| List | `/<collection>` | Browse, search, select, and act |
+| List | `/<collection>` | Browse, filter, select, act |
 | Detail | `/<collection>/:id` | Read one record |
 | Detail, new | `/<collection>/new` | Create one record |
 | Detail, edit | `/<collection>/:id/edit` | Amend one record |
@@ -130,87 +155,113 @@ mode changes which are editable and which actions appear, not the layout.
 ## 5. The list screen
 
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│  <Plural>                                             [Add] [Delete]  │
-│  A sentence saying what this collection is.                           │
-├───────────────────────────────────────────────────────────────────────┤
-│  [ Search…            ]  [ Filter by type ▾ ]   [ Label ▾ ]   42 of 380│
-├───────────────────────────────────────────────────────────────────────┤
-│  ▏ Name         Type      Code       Status     Modified    Recorded  │
-│  ├─────────────────────────────────────────────────────────────────── │
-│  │  …                                                              …  │
-├───────────────────────────────────────────────────────────────────────┤
-│  [⟲ Refresh]                    ‹ 1 of 4 ›  [100 ▾]  [Load all]       │
-└───────────────────────────────────────────────────────────────────────┘
+  <Plural>                                        [Refresh] [Add]
+  A sentence saying what this collection is.
+  [ Search...          ]  [ Type v ]                       42 of 380
+  ---------------------------------------------------------------------
+   Name         Type      Code       Status     Modified    Recorded
+  ---------------------------------------------------------------------
+   ...                                                             ...
+  ---------------------------------------------------------------------
+  No records           < First < Prev  Page 1 of 4  Next > Last >
+                       Page size: [100 v]  [Load all]
 ```
 
 ### Header
 
 - The plural noun as the page title, sentence case.
-- One sentence saying what the collection is. Not a tooltip, not a paragraph.
-- Actions at the right: **Add** (primary), and **Delete** (danger, enabled only
-  with a selection).
-
-### Toolbar
-
-| Control | Behaviour |
-|---|---|
-| Search | Filters on the entity's searchable fields. The display name always, plus any field a person would reasonably type. Debounced by about 250 ms. |
-| Type filter | A dropdown of the entity's classification field, when it has one. Includes an "All" entry. |
-| Label filter | A dropdown of labels, when the entity carries them. Hidden entirely when no record has a label, so a control that does nothing is never shown. |
-| Count | `"<shown> of <total>"` at the right, updating as filters change. |
-
-Search and filters run in the browser over the loaded page. When the server
-applies them, the same controls drive the query instead, and the layout does not
-change.
+- One sentence saying what the collection is.
+- Actions at the right: **Refresh** and **Add** (primary).
 
 ### Toolbar and row actions
 
+The Qt standard's action set, in its order, with its icons:
+
 | Action | Icon | Enabled when | Behaviour |
 |---|---|---|---|
+| Refresh | `arrow_clockwise` | Not loading | Reloads from the first page |
 | Add | `add` | Always | Opens the detail screen in create mode |
-| Delete | `delete` | One or more rows selected | Confirms, then deletes |
-| Refresh | `arrow_sync` | Not already loading | Reloads the page |
 | Edit | `edit` | Exactly one row selected | Opens the detail screen in edit mode |
+| Delete | `delete` | One or more rows selected | Confirms, then deletes |
+| History | `history` | Exactly one row selected | Opens the history screen |
 
-Opening a record is a click on the row. A separate Edit action exists for
-discoverability but the row is the primary affordance.
+An entity may add its own actions after History. The accounts screen adds Lock,
+Unlock and Reset password there, which is the right place for an action that acts
+on the selection.
 
-### Table
+Opening a record is a click on the row. Edit exists for discoverability, not as
+the only way in.
+
+**The Qt client has no keyboard shortcuts. There should be here.** Enter opens
+the selected record, Delete removes it, and the table is reachable from the
+keyboard. The omission is a gap, not a convention worth carrying.
+
+### The table
 
 - Columns come from a single declaration per entity, which is also what the
-  delegate uses to render cells. One source, so a column cannot be styled
-  differently from how it is defined.
-- The display name is always the first column and is the row's identity to a
-  person.
-- Audit columns — version, modified by, recorded at — are **hidden by default**.
-  They are available through the column menu rather than shown to everyone.
-- Column widths and visibility are remembered per user, and the saved state is
+  renderer uses. One source, so a column cannot be styled differently from how it
+  was declared.
+- The Qt client has ten column styles and they are worth keeping, because they
+  capture real distinctions: `text_left`, `text_center`, `mono_left`,
+  `mono_center`, `mono_bold_left`, `mono_right`, `mono_bold_center`,
+  `icon_centered`, `icon_text_left`, `badge_centered`.
+- The display name is the first column and is the row's identity to a person.
+- Selection is **single**. The accounts screen uses multi-selection, which is a
+  legacy deviation; bulk operations are a separate feature with a separate
+  design, not a table mode.
+- Audit columns are hidden by default and available through the column menu; the
+  set is in section 12.
+- Column visibility and order are remembered per user, and the saved state is
   versioned so a change to the column set does not restore an incompatible
   layout.
 - Sorting is available on every column. The default is the entity's natural
   order: name for reference data, most recent first for transactional data.
 
+**Two corrections to the Qt behaviour, both deliberate.** The Qt client sorts on
+the displayed string, so a numeric column sorts lexically and 10 comes before 9;
+here, sorting uses the underlying value. And the Qt client declares a default
+column width that no code consumes, so columns are whatever the user last
+dragged them to; here the declaration is honoured.
+
 ### Footer
 
-- Refresh on the left, paging on the right. The reference implementation put
-  refresh in the toolbar and paging in the footer; keep them together in the
-  footer so the toolbar holds only actions that act on a selection.
-- Page size is 100 by default, with 25, 50, 100, 250 and 500 offered.
-- **Load all** loads the complete set. Only offered when the total is below a
-  reasonable ceiling, because offering it for a hundred thousand records is a
-  trap.
+Paging, with the count first, then First, Previous, Next, Last and Load all, then
+"Page size:" with a selector offering 25, 50, 100, 200 and 500, defaulting to
+100. That is the Qt client's shape and it is kept.
+
+**Load all** is offered only when the total is at or below 1000, which is the
+rule the Qt client already applies. Offering it for a hundred thousand records is
+a trap.
+
+Changing the page size or page number resets to the first page, and a reload
+after a save returns to the first page rather than the page you were on. The Qt
+client documents this and it is right: the changed record may no longer be on the
+page you were looking at.
 
 ### States
 
 | State | Presentation |
 |---|---|
-| Loading, first time | A skeleton or a quiet "Loading…". Never an empty table with no explanation. |
-| Loading, with data | Keep the current rows, dim them slightly, mark the count as refreshing. Never blank the table. |
-| Empty, no records | The display name of the collection and a line saying how to create the first one, with the Add action. |
-| Empty, filtered | "No <collection> match the current filter." with a way to clear the filter. Distinguished from genuinely empty. |
-| Error | A message with the server's own words where it gave any, and a Retry action. |
-| Stale | The refresh action pulses when the server reports a change to this collection. |
+| Loading, first time | A quiet "Loading...". Never an empty table with no explanation |
+| Loading, with data | Keep the rows, dim them, mark the count as refreshing. Never blank the table |
+| Empty, no records | Say the collection is empty and offer Add. The Qt client shows "No records" in the paging label alone, which is too quiet |
+| Empty, filtered | "No <collection> match the current filter." with a way to clear it |
+| Error | The server's own words, and a Retry. The Qt client uses a modal box; a screen-level message is better because it does not steal focus and can be retried in place |
+| Stale | The Refresh action pulses |
+
+### Recency
+
+The Qt client has a feature worth keeping and worth explaining, because it is
+invisible until it fires. After a reload, rows whose `recorded_at` is newer than
+the time of the previous reload are highlighted, and the highlight pulses to draw
+the eye. On the first load there is no baseline, so nothing is highlighted.
+
+The colour is a single gold, `rgb(255, 215, 0)`, applied to the text rather than
+the background. The pulse runs six cycles at 500 ms. The point is that a person
+watching a live system sees what just changed without re-reading the table.
+
+Worth carrying across, and worth making a setting, because a table that flashes
+on every update is worse than one that never does.
 
 ---
 
@@ -218,67 +269,125 @@ discoverability but the row is the primary affordance.
 
 ### Layout
 
+The Qt dialog is 600 by 700 with a minimum of 600 by 500. The root is a tab
+widget above a button row. The button row, in order, with its icons, is
+`Delete` (`delete`), `Close` (`dismiss`), `Save` (`save`), with Save as the
+default action.
+
+A read-only toolbar appears above the tabs only when viewing a historical
+version, offering `Revert to this version`.
+
 ```
-┌───────────────────────────────────────────────────────────────┐
-│  <Name of the record>                       [Delete] [Save]   │
-├───────────────────────────────────────────────────────────────┤
-│  [ General ] [ Security ] [ Related ] [ Provenance ]          │
-├───────────────────────────────────────────────────────────────┤
-│                                                               │
-│   Field                Field                                  │
-│   Label                Label                                  │
-│   ┌────────────────┐   ┌────────────────┐                     │
-│   │                │   │                │                     │
-│   └────────────────┘   └────────────────┘                     │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+  <Name of the record>                              [Save]
+  [ General ] [ <Field group> ] [ Related ] [ Provenance ]
+   Field                Field
+   Label                Label
+   [______________]     [______________]
+                                        [Delete]  [Close]
 ```
 
 ### Tabs, and when each applies
 
+The generated standard emits one tab per field group declared for the entity,
+plus Provenance. The accounts dialog instead has six fixed tabs. The field-group
+rule is the standard because it is derivable from the model; the account's fixed
+tabs are not.
+
 | Tab | Applies to | Contents |
 |---|---|---|
-| **General** | Every entity | The entity's own fields. Always first, always present. |
-| **Security** | Entities with credentials | Passwords and their confirmation. Never shown for others. |
-| **Related** | Entities with child or junction records | One section per relationship, each a compact table with its own add and remove. |
-| **Provenance** | Every entity | Read-only. Version, recorded time, actors, and the reason for the last change. |
+| **General** | Every entity | The entity's own fields. Always first, always present |
+| **<Field group>** | When the entity declares one | The fields in that group |
+| **Related** | Entities with child or junction records | One section per relationship, each a small table with its own Add and Delete |
+| **Provenance** | Every entity | Read-only. The six rows in section 7 |
 
-A tab that would be empty is not rendered. A tab that is rendered but empty
-says so rather than showing blank space.
+A tab that would be empty is not rendered.
 
-Fields with nothing to show display "not recorded" rather than an empty cell, so
-a blank is never mistaken for a failure to load.
+Fields with nothing to show display "not recorded", so a blank is never mistaken
+for a failure to load.
 
 ### The form
 
-- One label per field, above the control. Sentence case, no trailing colon.
-- A hint below the control when the field needs explaining. One short sentence.
+- One label per field, above the control. The Qt labels carry a trailing colon,
+  "Username:". Sentence case without the colon is the web convention and reads
+  the same; this is a deliberate departure.
+- A hint below the control when the field needs explaining.
 - Required fields are marked, and the mark is described in words for a screen
   reader rather than being a bare asterisk.
-- Read-only fields are visibly read-only, not merely disabled: disabling makes
-  text hard to read and implies it might become editable.
-- Validation runs on blur, not on every keystroke, and never clears a message
+- Read-only fields are visibly read-only. The Qt client disables them in some
+  places and sets them read-only in others, inconsistently; read-only is the
+  rule, and a disabled control is used only where a whole section is inactive.
+- **The key field is editable only when creating.** The Qt rule is exactly right
+  and applies to every entity: `setReadOnly(!createMode)`. The username, the
+  code, the natural key, is fixed once the record exists.
+- The type or classification field is likewise disabled after creation, because
+  changing what a record is changes what it means.
+- Validation runs on blur, never on every keystroke, and never clears a message
   while the person is still typing the fix.
 - A field with an error shows the message beneath it, and focus moves to the
-  first field with an error on a failed submit.
+  first field with an error on a failed submit. The Qt client has no inline
+  errors at all and uses a modal warning; inline is better and is the standard
+  here.
+
+### Field controls
+
+The Qt model declares a widget type per field, and the set is good because each
+implies its validation:
+
+| Type | Control | Notes |
+|---|---|---|
+| `line_edit` | Text input | The common case |
+| `text_edit` | Text area, 80-150px | Commentary and notes |
+| `static_combo` | Select, fixed options | The options are declared, not fetched |
+| `dynamic_combo` | Select, options fetched | A foreign key, loaded from its collection |
+| `flagged_combo` | Select with flags | Countries and similar |
+| `check_box` | Checkbox | Optionally tri-state, which needs a "not set" state distinct from false |
+| `spin_box` | Number input | With a minimum and maximum; a nullable integer shows "(unset)" |
+| `colour` | Colour swatch | Opens a picker |
+| `date` | Date picker | Validated as a real date before parsing |
+
+A field that is a foreign key is always a searchable select, never free text.
+Typos in keys are the most expensive kind of bad data.
 
 ### Actions
 
 | Action | Placement | Behaviour |
 |---|---|---|
 | Save | Primary, top right | Validates, prompts for the audit reason, submits |
-| Delete | Danger, top right | Confirms, prompts for the audit reason, deletes |
-| Cancel | Secondary | Leaves without saving, confirming if anything changed |
+| Delete | Danger, bottom right | Confirms, prompts for the audit reason, deletes |
+| Close | Secondary, bottom right | Leaves, confirming if anything changed |
 
-Delete appears only in edit mode. Save appears in create and edit mode.
+Delete is not rendered in create mode. The Qt client disables it rather than
+hiding it; hidden is better, for the reason in section 11.
 
-### The audit prompt
+### Unsaved changes
 
-Every accepted write carries a reason. It is collected once, after the person
-has committed to the change and before it is sent, so the flow is: press Save,
-choose why, done.
+Closing with unsaved changes prompts: title "Unsaved Changes", text "You have
+unsaved changes. Close anyway?". That wording is exact and worth keeping.
 
-One dialog serves all three operations, and its wording follows the operation:
+---
+
+## 7. The audit rule
+
+**Every accepted write carries a reason.** This section is the one place the
+accounts screen is not merely different but wrong, and the difference is worth
+being explicit about.
+
+### What the accounts screen does
+
+- Creating an account prompts for no reason, and `save_account_request` has no
+  audit fields to carry one.
+- Deleting an account prompts for no reason.
+- Editing an account prompts only when parties or roles changed. A change to the
+  email, the full name or the job title is sent with empty audit fields, even
+  though `update_account_request` has the fields.
+
+So a person can change whose email an account uses, and the record will not say
+why. That is a defect, not a convention.
+
+### The rule
+
+Every create, amend and delete prompts for a reason, and the reason is stored.
+One dialog serves all three, and its wording follows the operation:
 
 | Operation | Title | Prompt | Commit button |
 |---|---|---|---|
@@ -287,11 +396,12 @@ One dialog serves all three operations, and its wording follows the operation:
 | Delete | Deletion Reason Required | Please select a reason for this deletion: | Confirm Delete |
 
 The dialog is at least 450px wide, offers the reason codes the server provides,
-and shows the selected reason's full description beneath the selector in muted
+and shows the selected reason's description beneath the selector in muted
 italic. The commit button is disabled until a reason is chosen.
 
-**Reasons are filtered by whether anything actually changed.** This is the rule
-that matters most and the one easiest to get wrong. One reason code,
+### Reasons are filtered by whether anything actually changed
+
+This is the rule that matters most and is easiest to get wrong. One code,
 `common.non_material_update`, means "touched but nothing changed". For a create
 every reason is offered. For an amend or a delete:
 
@@ -300,222 +410,347 @@ every reason is offered. For an amend or a delete:
 - If no fields were modified, every other reason is **disabled**, with the
   tooltip "Only available when fields have been modified".
 
-So a person cannot record a material change as a touch, nor a touch as a
-material change. The set of enabled reasons is a function of the diff, and the
-dialog computes it rather than trusting the person to choose honestly.
+So a person cannot record a material change as a touch, nor a touch as a material
+change. The enabled set is a function of the diff, computed rather than trusted.
 
-**Commentary is conditionally required.** Some reason codes require an
-explanation; the label reads "Commentary is required for this reason." and the
-field is marked required. For the rest it reads "Commentary is optional for this
-reason."
+### Commentary
 
-This is never optional and never hidden. A record whose reason is unknown is a
-record nobody can account for later.
+Some reason codes require an explanation. The label then reads "Commentary is
+required for this reason." and the field is marked required. Otherwise it reads
+"Commentary is optional for this reason."
+
+### Reason categories
+
+Reasons belong to a category, and the entity's category selects which are
+offered: `system` for creation, `common` for amendment and deletion. The
+categories come from the server, not from a list in the interface.
+
+### Provenance
+
+The detail screen's Provenance tab is read-only and shows exactly six rows, in
+this order, with these labels:
+
+`Version`, `Modified By`, `Performed By`, `Recorded At`, `Change Reason`,
+`Commentary`
+
+The tab is disabled in create mode, because a record that does not exist has no
+provenance.
 
 ---
 
-## 7. The history screen
+## 8. The history screen
 
-- Read-only. It is a record of what happened.
-- One row per version, most recent first.
-- Columns: version, the entity's display name as it was, the audit fields, and
-  the validity window for temporal entities.
-- A version that differs from its predecessor is marked, so a scan finds the
-  change without reading every row.
-- The current version is marked as current.
+Two layouts exist in the Qt client. The generic compare-mode dialog is the
+standard; the accounts screen's bespoke one is not.
+
+### The standard
+
+A horizontal split. On the left a timeline, on the right a diff.
+
+- The timeline is 220-320px wide, headed "History Timeline", newest first. Each
+  entry reads `v<version> . <relative time>`, with the full timestamp on hover,
+  and below it the modifier, the performer, the reason code as a badge, and the
+  commentary in italic. Clicking previews that version against its predecessor.
+- The right pane is headed "Compare:", with two selects for the from and to
+  versions and a control offering "All Fields" or "Only Changes". The diff uses
+  line and span highlighting, so a changed span within a line is marked rather
+  than only whole lines.
+- Choosing a from version newer than the to version says "The From version must
+  be older than the To version." Selecting the same version twice says
+  "(No field changes)".
+- The oldest version has nothing to compare against and shows "(Initial
+  version)". A version with no differences shows "(No field changes)".
+- Provenance fields are excluded from the diff and shown on the timeline entry
+  only, because version and actor differ by definition and diffing them is noise.
+- The toolbar offers `Reload` (`arrow_clockwise`), `Open` (`edit`) and `Revert`
+  (`arrow_rotate_counterclockwise`). Open can be used with any selection; Revert
+  only when the selection is not the current version.
+- Reverting prompts: "Are you sure you want to revert '%1' from version %2 back
+  to version %3? This will create a new version with the data from version %3."
+  Reverting creates a new version; it never removes one.
+
+### The accounts shortcut
+
+Opening a version in read-only mode reopens the detail screen with Save and
+Delete hidden, a "Revert to this version" action shown, and the Security tab
+disabled. That is the right treatment and is kept.
 
 ---
 
-## 8. Icons
+## 9. Child and related records
+
+A child entity is never listed independently. It appears as a tab on its parent
+with a table and two actions.
+
+The generic contract is a table built from column headers, an add label and a
+delete label. For an account's contact details the columns are `Email`,
+`Country`, `Street`, `City`, `Phone`, and the actions are `Add Contact` and
+`Delete Contact`.
+
+The rules, all of which the Qt client gets right and are worth keeping:
+
+- The table is read-only; double-click opens a child dialog. No inline editing.
+- Adding before the parent is saved is refused with "Save the account first,
+  then add contact information."
+- Adding while disconnected is refused with "Cannot add contact while
+  disconnected from server."
+- Deleting asks for confirmation. The Qt client does **not** prompt for a change
+  reason here, which contradicts section 7 and is treated as a defect.
+- The whole section is read-only when the parent is being viewed historically.
+- The column set is declared once per relationship, never hand-built inline.
+
+---
+
+## 10. Icons
 
 Every icon comes from Microsoft Fluent UI System Icons, named
 `ic_fluent_<concept>_<size>_<variant>`. Regular variants are for passive and
-secondary actions; filled for active and primary. Sizes are 16px inline and in
+secondary actions, filled for active and primary. Sizes are 16px inline and in
 dense tables, 20px in buttons and navigation, 32px in headers, 48px for empty
-states.
+states. The application recolours icons to `rgb(220, 220, 220)` by default.
 
-This table is normative. When an entity needs an action not listed, find the
-concept in the icon guidelines and add it here rather than choosing freely at
-the call site, because two entities using different icons for the same idea is
-the inconsistency this document exists to prevent.
+This table is normative. When an entity needs an action that is not listed, find
+the concept in the icon guidelines and add it here rather than choosing freely at
+the call site, because two entities using different icons for one idea is the
+inconsistency this document exists to prevent.
 
 ### Actions
 
 | Concept | Icon | Used for |
 |---|---|---|
+| Refresh | `arrow_clockwise` | Reloading a list; the stale pulse animates this same icon |
 | Add | `add` | Creating a record |
-| Edit | `edit` | Opening a record for change |
+| Edit | `edit` | Opening a record, and opening a historical version |
 | Delete | `delete` | Removing a record |
-| Delete, destructive | `delete_dismiss` | Purge and bulk delete |
+| History | `history` | Opening the version history |
 | Save | `save` | Committing a change |
-| Copy | `copy` | Duplicating a record |
-| Refresh | `arrow_sync` | Reloading |
+| Close | `dismiss` | Closing without saving |
+| Revert | `arrow_rotate_counterclockwise` | Restoring a historical version |
 | Undo | `arrow_undo` | Reverting an edit |
 | Redo | `arrow_redo` | Reapplying an edit |
+| Copy | `copy` | Duplicating a record |
 | Search | `search` | Search fields |
 | Filter | `filter` | Filter controls |
 | Settings | `settings` | Configuration |
-| History | `history` | Opening the version history |
 | Confirm | `checkmark` | Confirmation, selected state |
-| Dismiss | `dismiss` | Closing, cancelling |
-| Star | `star` | Favourited, with its filled variant for the active state |
+| Star | `star` | Favourited, filled variant for the active state |
 | Generate | `wand` | Generating synthetic or sample data |
+| Import | `arrow_download` | Reading a file |
+| Export | `arrow_upload` | Writing a file |
+| Purge | `delete_dismiss` | Bulk destruction, not ordinary deletion |
 | Publish | `publish` | Uploading to production tables |
-| Export | `arrow_download` | Writing a file |
-| Import | `arrow_upload` | Reading a file |
 | Lock | `lock_closed` | Locking a record |
 | Unlock | `lock_open` | Unlocking a record |
 | Password reset | `password_reset` | Forcing a password change |
 | Terminal | `terminal` | Shell and console surfaces |
 | Record | `record` | Recording controls |
 
-### Columns and cells
+A dropdown chevron is not from this set; it is the platform's own control.
 
-| Concept | Icon or treatment |
+### Cells
+
+| Concept | Treatment |
 |---|---|
-| Boolean true | `checkmark`, or the words "Yes" |
-| Boolean false | `dismiss`, or the words "No" |
-| Status or classification | A badge, coloured by meaning, text only |
-| Country | A flag |
-| Currency | The code, monospace |
+| A flag column | A 16px flag, centred when alone, followed by text when combined |
+| Boolean true | The word "Yes", or a checkmark where space is tight |
+| Boolean false | The word "No", or a dismiss mark |
+| A status or classification | A pill, coloured by meaning, text only |
 | An identifier | Monospace, left aligned |
 | A quantity or amount | Monospace, right aligned, tabular figures |
-| A timestamp | Monospace, local time, with the exact value on hover |
+| A timestamp | Monospace, relative, with the exact value on hover |
+| A currency | Its code, monospace |
+| An unmapped lookup value | The fallback pill, orange with a dashed border, so a missing mapping is visible rather than silent |
 
-An icon never appears alone where its meaning is not obvious. If removing an
-icon loses no meaning, remove it.
+An icon never appears alone where its meaning is not obvious. If removing an icon
+loses no meaning, remove it.
 
 ---
 
-## 9. Feedback
+## 11. Feedback, access, and safety
+
+### Feedback
 
 | Situation | Presentation |
 |---|---|
-| A save succeeded | A brief confirmation naming the record, then return to the list. |
-| A save failed validation | Field messages where the problem is, and a summary at the top. |
-| A save failed on the server | The server's own message, verbatim, because it knew something we did not. |
-| A name is already taken | The conflict says which name, and the field is highlighted. |
-| A session expired | A clear statement that the session ended and a way to sign in again. Never a silent failure. |
-| The server is unreachable | Said plainly, with a Retry. Never a spinner that never resolves. |
-| A delete succeeded | A confirmation that names the record. |
+| A save succeeded | A brief confirmation naming the record, then return to the list |
+| A save failed validation | Field messages where the problem is, and a summary at the top |
+| A save failed on the server | The server's own message, verbatim, because it knew something we did not |
+| A name is already taken | The conflict names the name, and the field is highlighted |
+| A session expired | A clear statement, and a way to sign in again. Never a silent failure |
+| The server is unreachable | Said plainly, with a Retry. Never a spinner that never resolves |
+| The record changed underneath | Said so, and offer to reload. The Qt client marks the list stale and shows "has been modified on the server" |
 
 Every message says what happened and what to do next. "Error" alone is not a
-message.
+message. The Qt client's exact validation strings are worth keeping: "Username is
+required.", "Passwords do not match.". The server's own text is always preferred
+where there is any.
 
----
+### Access
 
-## 10. Access
-
-- Actions the person is not permitted to perform are **not rendered**, rather
-  than rendered and disabled. A disabled button invites a question that a
-  missing one does not.
+- An action the person may not perform is **not rendered**, rather than rendered
+  and disabled. A disabled button invites a question a missing one does not.
 - Permissions are decided by the server. The interface hides what the server
-  would refuse, and does not attempt to be the authority.
-- A refusal from the server is shown as a refusal, not as a failure, because
-  the person did nothing wrong.
+  would refuse and never attempts to be the authority.
+- A refusal is shown as a refusal, not as a failure.
+
+### Safety
+
+- A destructive action confirms first, and the confirmation says what will be
+  lost. "Are you sure you want to delete account 'jdoe'?" is the shape.
+- Deletion is soft wherever anything references the record, and the interface
+  says which of the two it is doing. A deletion that removes history is a
+  different action from one that does not, and they must not look the same.
+- Reverting creates a new version. It never removes one, and the confirmation
+  says so.
 
 ---
 
-## 11. Naming
+## 12. Naming and the default column set
 
-For an entity named `book`, in a component named `refdata`:
+For an entity named `book` in a component named `refdata`:
 
 | Thing | Convention | Example |
 |---|---|---|
 | Domain type | PascalCase singular | `Book` |
-| Screen components | PascalCase, suffixed | `BookListPage`, `BookDetailPage`, `BookHistoryPage` |
+| Screens | PascalCase, suffixed | `BookListPage`, `BookDetailPage`, `BookHistoryPage` |
 | Query hooks | `use` plus the operation | `useBooks`, `useSaveBook`, `useDeleteBook` |
 | Protocol file | singular | `book_protocol.ts` |
 | HTTP routes | plural, kebab | `/api/books`, `/api/books/:id` |
-| NATS subjects | component, version, plural, verb | `refdata.v1.books.list` |
+| Subjects | component, version, plural, verb | `refdata.v1.books.list` |
 | Wire fields | the server's C++ names | `modified_by`, never `modifiedBy` |
 | Domain fields | camelCase | `modifiedBy` |
-| Labels in the interface | Sentence case | "Job title", not "Job Title" |
+| Interface labels | Sentence case | "Job title" |
 
 The interface says "Delete" and "Add", not "Remove" and "Create", except where a
-record is detached from a parent rather than deleted, where it says "Remove".
+record is detached from a parent rather than destroyed, where it says "Remove".
 
----
-
-## 12. The default column set
-
-Independent of the entity, these are hidden by default and available through the
-column menu:
+### Hidden by default
 
 `version`, `modified_by`, `performed_by`, `recorded_at`, `change_reason_code`,
-`change_commentary`, `tenant_id`
+`change_commentary`, `tenant_id`, and `description` on every entity.
 
-`id` is never shown by default and never offered, because nobody reads a UUID.
-It is available through a copy action on the detail screen.
+`id` is never shown and never offered, because nobody reads a UUID. It is
+available through a copy action on the detail screen.
+
+The Qt client hides `description` on every entity by rule and the audit fields by
+declaration. Same result, and the rule is worth keeping.
 
 ---
 
-## 13. Implementing a new entity
+## 13. Where the Qt client disagrees with itself
 
-Work through this in order. Each step ends in something checkable, so a mistake
-is caught where it was made rather than three steps later.
+Recorded so the port does not inherit a defect by accident. In each case this
+document takes the generated standard.
+
+| The accounts screen | The standard, and here |
+|---|---|
+| Create and delete never prompt for a reason | Every write prompts; see section 7 |
+| A pure field edit is sent with empty audit fields | Every write carries a reason |
+| Six bespoke tabs | One tab per declared field group |
+| Multi-selection with bulk actions | Single selection; bulk is a separate feature |
+| A per-entity delegate class | One shared renderer driven by column declarations |
+| Sorts on the displayed string | Sorts on the underlying value |
+| Declares a default column width nothing applies | The declaration is honoured |
+| A bespoke history dialog with a two-field diff | The generic compare dialog with a real diff |
+| Disabled rather than hidden for unavailable actions | Hidden |
+| Delete disabled in create mode | Delete not rendered in create mode |
+| Modal boxes for load and save errors | A screen-level message, retryable in place |
+| No inline field validation | Inline messages on blur |
+| No search or filter on the list | Search and a type filter, on the list |
+
+The last row is not a disagreement but a gap. The Qt standard list screen has
+**no search box and no filter**. Every other CRUD application has one, and a
+person looking for one record among four hundred will not page through to find
+it. Search is part of this specification even though the reference lacks it.
+
+---
+
+## 14. Implementing a new entity
+
+Work through this in order. Each step ends in something checkable, so a mistake is
+caught where it was made rather than three steps later.
 
 ### Before writing code
 
-1. **Confirm it is an entity.** It has all six properties in §2. If it does not,
-   say so and agree the exception before proceeding.
-2. **Classify it.** Reference data or transactional. Lookup or free-form.
-   Temporal or not. Its classification decides its columns, its sort order and
-   whether history is offered.
-3. **Find its collection name** and its display field.
+1. **Confirm it is an entity.** It has all six properties in section 2. If it
+   does not, say so and agree the exception before proceeding.
+2. **Classify it.** Reference or transactional. Lookup or free-form. Temporal or
+   not. That decides its columns, its sort order, and whether history exists.
+3. **Name the collection and the display field.**
+4. **Group its fields.** Each group becomes a tab. A group with one field is
+   usually a mistake.
 
 ### Protocol
 
-4. Add the request and reply schemas for list, save, delete and history.
-5. Add the subjects.
-6. Test that a real round trip against the running service parses, using a
-   rejected or empty case to prove the wire format rather than the happy path
-   alone.
+5. Add the request and reply schemas for list, save, delete and history.
+6. Add the subjects.
+7. Prove a round trip against the running service, using a rejected or empty case
+   as well as a good one, because a well-formed rejection proves the wire format
+   where a success might not.
 
 ### Endpoint
 
-7. Add the routes: list, get, create, update, delete, history where applicable.
-8. Validate every input at the boundary and map every failure to a status.
-9. Assert that no field the entity marks as secret appears in any response.
+8. Add the routes: list, get, create, update, delete, and history where it
+   applies.
+9. Validate every input at the boundary and map every failure to a status.
+10. Assert that no field the entity marks as secret appears in any response.
 
 ### Screens
 
-10. Declare the columns once.
-11. Build the list screen from the shared shell.
-12. Build the detail screen with the General tab and, where they apply, the
-    security, related and provenance tabs.
-13. Build the history screen when the entity is temporal.
-14. Wire the audit prompt into save and delete.
+11. Declare the columns once.
+12. Build the list screen from the shared shell, including search and the type
+    filter.
+13. Build the detail screen with the field-group tabs and Provenance.
+14. Build the history screen where the entity is temporal.
+15. Wire the audit prompt into save and delete, including the diff-driven reason
+    filter.
 
 ### Verification
 
-15. Drive the real screens in a browser: list, search, filter, open, create,
-    edit, delete, and the history where it exists.
-16. Assert the states that are easy to forget: empty, filtered-empty, error,
+16. Drive the real screens in a browser: list, search, filter, open, create,
+    edit, delete, and history where it exists.
+17. Assert the states that are easy to forget: empty, filtered-empty, error,
     loading with existing data, and unauthorized.
 
 ### Finish
 
-17. Add the entity to the navigation.
-18. Document anything about this entity that would surprise the next person.
+18. Add the entity to the navigation.
+19. Record anything about this entity that would surprise the next person.
 
 ---
 
-## 14. Exceptions
+## 15. Exceptions
 
-Some entities genuinely are not regular, and the exception has to be named and
-justified rather than discovered later by someone wondering why this one is
-different.
+Some entities genuinely are not regular. The exception is named and justified,
+never discovered later by someone wondering why this one is different.
 
 | Kind | What differs |
 |---|---|
-| **Lookup** | Few fields, may be edited inline rather than on a detail screen, no history |
-| **Junction** | No detail screen of its own; managed from one of its parents |
-| **Child** | Never listed independently; always a section of its parent |
+| **Lookup** | Few fields, may be edited inline, no history |
+| **Junction** | No detail screen of its own; managed from a parent |
+| **Child** | Never listed independently; a section of its parent |
 | **Singleton** | One record by definition, so no list and no add or delete |
 | **Read-only** | Derived or imported, so no save or delete |
-| **Transactional** | Sorted most recent first, and deletion is usually prohibited |
+| **Transactional** | Most recent first, and deletion usually prohibited |
 
 An exception changes which screens exist and which actions appear. It never
 changes the layout of the screens that do exist, and it never introduces a new
 icon for an existing concept.
+
+---
+
+## Sources
+
+Derived from the Qt client. The documents worth reading alongside this one:
+
+- `projects/ores.qt/api/docs/entity_controller_pattern.org` - the four-layer stack
+- `projects/modeling/qt_facet.org` - the generated facet and its templates
+- `projects/modeling/entity_lifecycle.org` - the complete per-entity file
+  inventory across every layer
+- `doc/knowledge/ui/icon_guidelines.org` - the icon catalogue and naming rules
+- `projects/ores.qt/api/include/ores.qt/ColumnMetadata.hpp` - the column styles
+- `projects/ores.qt/api/include/ores.qt/EntityListMdiWindow.hpp` - the list
+  window contract
+- `projects/ores.qt/api/src/ChangeReasonDialog.cpp` - the audit prompt
+- The generated templates under `projects/ores.codegen/library/templates/`, which
+  are the authoritative implementation of the standard
