@@ -1,0 +1,136 @@
+/**
+ * `@volga/protocol` is the only place that knows how ORE Studio speaks on the
+ * NATS bus: the msgpack encoding, the subject names, the snake_case field
+ * names, and the `X-Error` contract.
+ *
+ * Everything above this package works with the camelCase domain types exported
+ * here. The server's credential fields are dropped at the parse boundary and
+ * are not represented at all.
+ */
+
+export {
+  LIVE_WORKSPACE_ID,
+  SYSTEM_TENANT_ID,
+  fromWireTimestamp,
+  isUuid,
+  isWireTimestamp,
+  toWireTimestamp,
+  uuid,
+  wireTimestamp,
+} from './primitives.js';
+export type { Uuid, WireTimestamp } from './primitives.js';
+
+export {
+  ACCOUNT_TYPES,
+  accountPageSchema,
+  accountSchema,
+  activePartySchema,
+  partySummarySchema,
+} from './domain.js';
+export type { Account, AccountPage, AccountType, ActiveParty, PartySummary } from './domain.js';
+
+export {
+  ProtocolError,
+  MalformedResponseError,
+  NotAuthenticatedError,
+  NotConnectedError,
+  OperationFailedError,
+  RequestTimeoutError,
+  ServerError,
+  ServiceUnavailableError,
+  SessionExpiredError,
+  TransportError,
+  serverErrorFor,
+  X_ERROR_HEADER,
+} from './errors.js';
+export type { ServerErrorCode } from './errors.js';
+
+export { GZIP_ENCODING, CONTENT_ENCODING_HEADER, WireCodec } from './codec.js';
+export type { WireFormat } from './codec.js';
+
+export { NatsTransport } from './transport.js';
+export type { NatsTransportOptions, Reply, RequestHeaders, TlsMaterial, Transport } from './transport.js';
+
+export { resolveHeaders } from './headers.js';
+export type { HeaderSource } from './headers.js';
+
+export {
+  DEFAULT_TIMEOUTS,
+  OresClient,
+} from './client.js';
+export type {
+  ActiveSession,
+  LoginCredentials,
+  LoginOutcome,
+  LoginRejected,
+  OresClientOptions,
+  PartySelectionRequired,
+  Timeouts,
+  WorkspaceContext,
+} from './client.js';
+
+export {
+  SUBJECTS,
+  accountIdsRequestSchema,
+  accountOperationResultSchema,
+  accountPageSchema as wireAccountPageSchema,
+  changePasswordRequestSchema,
+  changePasswordResultSchema,
+  emptyRequestSchema,
+  httpInfoResponseSchema,
+  listAccountsRequestSchema,
+  lockResultSchema,
+  loginRequestSchema,
+  loginResponseSchema,
+  logoutResponseSchema,
+  partyRequestSchema,
+  partyResponseSchema,
+  refreshResponseSchema,
+  wirePartySchema,
+} from './operations.js';
+export type {
+  AccountIdsRequest,
+  AccountOperationResult,
+  ChangePasswordRequest,
+  ChangePasswordResult,
+  HttpInfoResponse,
+  ListAccountsRequest,
+  LoginRequest,
+  LoginResponse,
+  LockResult,
+  LogoutResponse,
+  PartyRequest,
+  PartyResponse,
+  RefreshResponse,
+  WireAccountPage,
+} from './operations.js';
+
+export {
+  ACCOUNT_SUBJECTS,
+  changeOwnPassword,
+  deleteAccount,
+  setAccountsLocked,
+} from './account-operations.js';
+export type { AuthenticatedCaller } from './account-operations.js';
+
+// The HTTP contract shared by the BFF and the browser. Both sides parse with
+// these definitions, so the network boundary is checked at runtime.
+export {
+  accountListSchema,
+  apiErrorSchema,
+  loginRequestSchema as httpLoginRequestSchema,
+  loginResultSchema,
+  loginSuccessSchema,
+  partyChoiceSchema,
+  selectPartyRequestSchema,
+  sessionViewSchema,
+  sseEnvelopeSchema,
+} from './contracts.js';
+export type {
+  AccountList,
+  ApiError,
+  LoginResult,
+  LoginSuccess,
+  PartyChoice,
+  SessionView,
+} from './contracts.js';
