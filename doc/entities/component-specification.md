@@ -435,18 +435,21 @@ packages/web/src/
 The `components/` tree holds declarations and entity-specific data. The `entity/`
 directory holds the machinery and never mentions an entity by name.
 
-### Where the protocol lives
+### Where the generated declarations live
 
-Generated from C++, in `@volga/protocol`:
+Both the protocol schemas and the UI metadata are generated from the same org
+models, so the columns and fields cannot drift from the types they describe.
 
 ```
 packages/protocol/src/generated/
   iam/
-    account_protocol.ts          operations, request and reply schemas
-    account.ts                   the domain type
+    protocol/account_protocol.ts   operations, request and reply shapes
+    ui/account_ui.ts               columns and fields
 ```
 
-The entity declaration refers to those schemas by name. It does not declare them.
+The entity declaration refers to those by name. It does not declare them, and
+neither file is edited by hand. What remains hand-written per entity is the field
+grouping and the entity's description; see `codegen-ts-ui-request.md`.
 
 ---
 
