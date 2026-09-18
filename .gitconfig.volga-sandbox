@@ -1,0 +1,27 @@
+# Sandbox-only git overrides for this repository.
+#
+# DSH runs agent commands inside a user namespace whose uid map is `1000 0 1`,
+# so the host's uid 0 has no mapping and every root-owned file reports as
+# `nobody(65534)`. OpenSSH refuses to load a config file it does not trust and
+# aborts the whole load, so `/etc/ssh/ssh_config` including
+# `/etc/ssh/ssh_config.d/*.conf` makes every SSH connection fail inside the
+# sandbox with:
+#
+#   Bad owner or permissions on /etc/ssh/ssh_config.d/20-systemd-ssh-proxy.conf
+#
+# `-F /dev/null` skips config loading entirely, which sidesteps the ownership
+# check. Nothing else here changes: the remote is still
+# git@github.com:OreStudio/Volga.git and authentication still uses the key
+# already loaded in ssh-agent.
+#
+# An ordinary shell outside the sandbox does not need this and should not use
+# it, because `-F /dev/null` also discards the host aliases in ~/.ssh/config.
+#
+# Activate for this repository only:
+#   git config --local include.path ../.gitconfig.volga-sandbox
+#
+# Deactivate:
+#   git config --local --unset include.path
+
+[core]
+	sshCommand = ssh -F /dev/null
