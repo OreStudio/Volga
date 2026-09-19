@@ -117,6 +117,7 @@ const fr: SourceCatalogue = {
     saving: 'Enregistrement...',
     close: 'Fermer',
     cancel: 'Annuler',
+    changedBanner: 'Cette liste a changé depuis votre chargement.',
     changed: 'Cette liste a changé sur le serveur. Rechargez pour la voir.',
     refresh: 'Recharger',
     history: 'Historique',

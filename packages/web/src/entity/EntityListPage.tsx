@@ -233,6 +233,31 @@ export function EntityListPage<Row extends Record<string, unknown>>({
         </div>
       </header>
 
+      {/*
+        Changes are pending, and it says so where it cannot be missed.
+        
+        The reload action carried a tooltip, which is not a notification: it is
+        there only for somebody already looking at the control and wondering. A
+        person who cannot tell that something changed will not go looking, so the
+        news goes at the top of what they are reading.
+      */}
+      {stale && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-accent/40 bg-accent/[0.08] px-3.5 py-2.5">
+          <MaskIcon name="arrowSync" className="size-4 animate-pulse text-accent" />
+          <span className="text-sm text-ink">{t('entity.changedBanner')}</span>
+          <Button
+            variant="primary"
+            size="sm"
+            className="ml-auto"
+            onClick={onReload}
+            pending={query.isFetching}
+            pendingLabel={t('accounts.refreshing')}
+          >
+            {t('entity.refresh')}
+          </Button>
+        </div>
+      )}
+
       {failureMessage !== undefined && (
         <div className="mb-4">
           <Notice tone="error">{failureMessage}</Notice>

@@ -77,3 +77,33 @@
     @apply rounded-[var(--radius-card)] border border-line bg-surface-raised;
   }
 }
+
+/*
+ * A row that changed, flashing as it arrives.
+ *
+ * The mark stays, so a person who looked away still finds it, but it runs a few
+ * times and stops. Something that flashes forever is not news, it is a decoration
+ * that becomes annoying within a day — which is why the animation carries an
+ * iteration count and the border underneath it does not.
+ */
+@keyframes row-changed {
+  0%,
+  100% {
+    background-color: color-mix(in oklab, var(--color-accent) 7%, transparent);
+  }
+  50% {
+    background-color: color-mix(in oklab, var(--color-accent) 22%, transparent);
+  }
+}
+
+.row-changed {
+  animation: row-changed 900ms ease-in-out 3;
+}
+
+/* A person who asked their system for less motion gets the mark without the
+   movement. The information is the same. */
+@media (prefers-reduced-motion: reduce) {
+  .row-changed {
+    animation: none;
+  }
+}

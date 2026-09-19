@@ -122,6 +122,7 @@ const pt: SourceCatalogue = {
     saving: 'A guardar...',
     close: 'Fechar',
     cancel: 'Cancelar',
+    changedBanner: 'Esta lista foi alterada desde que a carregou.',
     changed: 'Esta lista foi alterada no servidor. Atualize para a ver.',
     refresh: 'Recarregar',
     history: 'Histórico',

@@ -140,7 +140,7 @@ export function DataTable<Row extends Record<string, unknown>>({
                    * says it is still true.
                    */
                   changed?.has(rowKey(row)) === true &&
-                    'bg-accent/[0.07] shadow-[inset_2px_0_0_0_var(--color-accent)] transition-colors duration-1000',
+                    'row-changed shadow-[inset_2px_0_0_0_var(--color-accent)]',
                 )}
               >
                 {visible.map((column) => (
