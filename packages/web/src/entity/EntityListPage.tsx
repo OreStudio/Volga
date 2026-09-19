@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
@@ -162,6 +162,43 @@ export function EntityListPage<Row extends Record<string, unknown>>({
     query.dataUpdatedAt,
   );
   const stale = watchedAs !== undefined && changed;
+  /*
+   * The rows that moved, by comparison with the last load.
+   *
+   * Not against the time the change was announced, which does not work: a row is
+   * stamped when it is written and the announcement follows it, so the row is
+   * always a little older than the news and would never mark. What the mark
+   * means is "newer than what was here last time", and that is what it compares.
+   *
+   * Both sides are the service's clock, because both come from the rows
+   * themselves. This also means a reload a person asks for shows what changed
+   * since they last looked, whether or not anything was announced.
+   *
+   * Derived rather than remembered, so the marks appear when the reload brings
+   * the new rows in rather than when the news arrives and the old rows are still
+   * on screen.
+   */
+  const previousNewest = useRef<string | undefined>(undefined);
+  const marked = useMemo(() => {
+    const since = previousNewest.current;
+    if (since === undefined || since.length === 0) return new Set<string>();
+    return new Set(
+      rows
+        .filter((row) => String(row['recorded_at'] ?? '') > since)
+        .map((row) => String(row[meta.keyField] ?? '')),
+    );
+  }, [rows, meta.keyField]);
+
+  // Advanced after the marks have been taken, so the comparison is always
+  // against the load before this one.
+  useEffect(() => {
+    if (query.isFetching || rows.length === 0) return;
+    const newest = rows.reduce((newest, row) => {
+      const value = String(row['recorded_at'] ?? '');
+      return value > newest ? value : newest;
+    }, '');
+    if (newest.length > 0) previousNewest.current = newest;
+  }, [rows, query.isFetching]);
 
   const pages = Math.max(1, Math.ceil(totalCount / pageSize));
   const loading = query.isPending;
@@ -262,6 +299,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           rowKey={(row) => String(row[meta.keyField] ?? '')}
           {...(onOpen === undefined ? {} : { onOpen })}
           {...(rowActions.length === 0 ? {} : { rowActions })}
+          changed={marked}
           loading={loading}
           emptyMessage={isFiltered ? t('accounts.empty') : t('entity.noRecords')}
         />

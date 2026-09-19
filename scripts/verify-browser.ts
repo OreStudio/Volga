@@ -53,7 +53,7 @@ async function main(): Promise<number> {
   });
 
   console.log('\nthe landing page:');
-  await page.goto(APP_URL, { waitUntil: 'networkidle' });
+  await page.goto(APP_URL, { waitUntil: 'load' });
   await page.waitForSelector('h1', { timeout: 15_000 });
   const landing = (await page.textContent('body')) ?? '';
   check('a landing page is the entry point', landing.includes('Enterprise-grade risk analytics'));
@@ -76,7 +76,7 @@ async function main(): Promise<number> {
   check('it marks a development environment', footer.includes('development'));
 
   console.log('\nthe deployment page is behind sign-in:');
-  await page.goto(`${APP_URL}deployment`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP_URL}deployment`, { waitUntil: 'load' });
   await page.waitForSelector('input[name="username"]', { timeout: 15_000 });
   check('it redirects to the sign-in screen', await page.isVisible('input[name="username"]'));
 
@@ -86,7 +86,7 @@ async function main(): Promise<number> {
   }
 
   console.log('\nthe sign-in screen:');
-  await page.goto(`${APP_URL}login`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP_URL}login`, { waitUntil: 'load' });
   await page.waitForSelector('input[name="username"]', { timeout: 15_000 });
   const signIn = (await page.textContent('body')) ?? '';
   check('the username field is present', await page.isVisible('input[name="username"]'));
@@ -140,7 +140,7 @@ async function main(): Promise<number> {
   await screenshot(page, '32-accounts');
 
   console.log('\nthe deployment page, once signed in:');
-  await page.goto(`${APP_URL}deployment`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP_URL}deployment`, { waitUntil: 'load' });
   await page.waitForSelector('h1', { timeout: 15_000 });
   const deployment = (await page.textContent('body')) ?? '';
   check('it names the environment', deployment.includes('Festive Dijkstra'));

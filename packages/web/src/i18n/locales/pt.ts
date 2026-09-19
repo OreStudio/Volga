@@ -123,7 +123,7 @@ const pt: SourceCatalogue = {
     close: 'Fechar',
     cancel: 'Cancelar',
     changed: 'Esta lista foi alterada no servidor. Atualize para a ver.',
-    refresh: 'Atualizar',
+    refresh: 'Recarregar',
     history: 'Histórico',
     search: 'Pesquisar',
     filter: 'Filtrar',

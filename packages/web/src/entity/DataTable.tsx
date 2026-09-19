@@ -40,6 +40,13 @@ export interface DataTableProps<Row> {
    * words where a toolbar had room only for a glyph.
    */
   readonly rowActions?: readonly RowAction<Row>[];
+  /**
+   * The rows that changed on the last reload, by row key.
+   *
+   * A set rather than a flag, because a whole table flashing says nothing: the
+   * four rows that changed say everything.
+   */
+  readonly changed?: ReadonlySet<string>;
   readonly loading?: boolean;
   readonly emptyMessage: string;
 }
@@ -50,6 +57,7 @@ export function DataTable<Row extends Record<string, unknown>>({
   rowKey,
   onOpen,
   rowActions,
+  changed,
   loading = false,
   emptyMessage,
 }: DataTableProps<Row>): ReactNode {
@@ -125,6 +133,14 @@ export function DataTable<Row extends Record<string, unknown>>({
                 className={cx(
                   'border-b border-line/60 last:border-0',
                   onOpen !== undefined && 'cursor-pointer hover:bg-surface-overlay',
+                  /*
+                   * A row that changed is tinted and given a leading edge, and
+                   * the tint fades while the edge stays. A permanent tint becomes
+                   * decoration; a fading one stays news, and the edge is what
+                   * says it is still true.
+                   */
+                  changed?.has(rowKey(row)) === true &&
+                    'bg-accent/[0.07] shadow-[inset_2px_0_0_0_var(--color-accent)] transition-colors duration-1000',
                 )}
               >
                 {visible.map((column) => (

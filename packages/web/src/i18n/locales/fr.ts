@@ -118,7 +118,7 @@ const fr: SourceCatalogue = {
     close: 'Fermer',
     cancel: 'Annuler',
     changed: 'Cette liste a changé sur le serveur. Rechargez pour la voir.',
-    refresh: 'Actualiser',
+    refresh: 'Recharger',
     history: 'Historique',
     search: 'Rechercher',
     filter: 'Filtrer',

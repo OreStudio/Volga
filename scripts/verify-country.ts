@@ -16,6 +16,11 @@
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 
+/*
+ * Navigation waits for `load` and not `load`. The signed-in shell holds an
+ * open event stream so the network is never quiet again, and a wait for quiet
+ * waits forever.
+ */
 const APP = process.env['VOLGA_APP_URL'] ?? 'http://127.0.0.1:21802/';
 const USERNAME = process.env['VOLGA_USER'] ?? 'volga_probe';
 const PASSWORD = process.env['VOLGA_PASSWORD'] ?? 'Secure-Password-123';
@@ -40,10 +45,24 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto(`${APP}login`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP}login`, { waitUntil: 'load' });
   await page.fill('input[name="username"]', USERNAME);
   await page.fill('input[name="password"]', PASSWORD);
   await page.click('button[type="submit"]');
+
+  /*
+   * An account that works in more than one party chooses one before the
+   * interface opens. The accounts that own the data need this, so the script
+   * handles it rather than requiring an account that does not.
+   */
+  await page
+    .waitForSelector('button:has-text("Operational")', { timeout: 8_000 })
+    .then(async () => {
+      await page.locator('button:has-text("Operational")').first().click();
+      await page.waitForTimeout(2_500);
+    })
+    .catch(() => undefined);
+
   await page.waitForSelector('h1', { timeout: 25_000 });
 }
 
@@ -96,7 +115,7 @@ try {
   check('the sidebar lists the components', (await page.locator('aside nav > div').count()) >= 8);
 
   console.log('\nthe country list:');
-  await page.goto(`${APP}refdata/country`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP}refdata/country`, { waitUntil: 'load' });
   await page.waitForSelector('tbody tr', { timeout: 25_000 });
   await page.waitForTimeout(600);
 
@@ -171,12 +190,12 @@ try {
    */
   console.log('\ngetting back to the list:');
   await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Country/i }).first().click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   await page.waitForTimeout(500);
   check('a record leads back to the list', page.url().endsWith('/refdata/country'), page.url());
 
   console.log('\nthe history:\n');
-  await page.goto(`${APP}refdata/country/AR/history`, { waitUntil: 'networkidle' });
+  await page.goto(`${APP}refdata/country/AR/history`, { waitUntil: 'load' });
   await page.waitForTimeout(1200);
   const history = (await page.textContent('body')) ?? '';
   check('the history screen opens', history.length > 0);
@@ -195,11 +214,11 @@ try {
   const trail = await page.locator('nav[aria-label="Breadcrumb"]').textContent();
   check('the breadcrumb names the record', /Argentina/.test(trail ?? ''), (trail ?? '').trim());
   await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Argentina/ }).first().click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   await page.waitForTimeout(500);
   check('the history leads back to the record', page.url().endsWith('/refdata/country/AR'), page.url());
   await page.locator('nav[aria-label="Breadcrumb"] a', { hasText: /Country/i }).first().click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('load');
   await page.waitForTimeout(500);
   check('the record leads back to the list again', page.url().endsWith('/refdata/country'), page.url());
 
@@ -210,7 +229,7 @@ try {
     ['English', 'Countries'],
   ] as const) {
     await language(page, englishName);
-    await page.goto(`${APP}refdata/country`, { waitUntil: 'networkidle' });
+    await page.goto(`${APP}refdata/country`, { waitUntil: 'load' });
     await page.waitForSelector('tbody tr', { timeout: 20_000 });
     const localized = ((await page.textContent('h1')) ?? '').trim();
     check(`${englishName} renders the collection name`, localized === expected, localized);
@@ -221,7 +240,7 @@ try {
     console.log('\nthe write path:');
     // Deliberately last, and gated, because it changes records and because it is
     // the half that needs a provisioned account.
-    await page.goto(`${APP}refdata/country/new`, { waitUntil: 'networkidle' });
+    await page.goto(`${APP}refdata/country/new`, { waitUntil: 'load' });
     await page.waitForTimeout(600);
     const createHeading = ((await page.textContent('h1')) ?? '').trim();
     check('the create screen opens', createHeading.length > 0, createHeading);
@@ -246,7 +265,7 @@ try {
     await shot(page, '75-country-create-reason');
 
     await page.locator('[role="dialog"] button', { hasText: /^Create$/ }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.waitForTimeout(800);
 
     // The record should now exist and the screen should be showing it.
@@ -263,7 +282,7 @@ try {
     const amendReasons = page.locator('[role="dialog"] select');
     check('amending prompts for a reason', (await amendReasons.locator('option').count()) > 0);
     await page.locator('[role="dialog"] button', { hasText: /^Save$/ }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.waitForTimeout(800);
     await page
       .locator('h1', { hasText: 'amended' })
@@ -273,14 +292,14 @@ try {
     check('the amendment is saved', amended.includes('amended'), amended);
 
     // The history should hold both versions.
-    await page.goto(`${APP}refdata/country/XQ/history`, { waitUntil: 'networkidle' });
+    await page.goto(`${APP}refdata/country/XQ/history`, { waitUntil: 'load' });
     await page.waitForTimeout(1500);
     const versions = await page.locator('ol li').count();
     check('the history holds both versions', versions >= 2, `${versions} versions`);
     await shot(page, '77-country-history-written');
 
     // Delete it, so the verification leaves the system as it found it.
-    await page.goto(`${APP}refdata/country/XQ/edit`, { waitUntil: 'networkidle' });
+    await page.goto(`${APP}refdata/country/XQ/edit`, { waitUntil: 'load' });
     await page.waitForTimeout(1200);
     await page.locator('button[title="Delete"]').first().click();
     await page.waitForTimeout(600);
@@ -295,10 +314,10 @@ try {
       `dialog="${dialogLabel}"`,
     );
     await page.locator('[role="dialog"] button', { hasText: /^Confirm Delete$/ }).click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.waitForTimeout(800);
 
-    await page.goto(`${APP}refdata/country`, { waitUntil: 'networkidle' });
+    await page.goto(`${APP}refdata/country`, { waitUntil: 'load' });
     await page.waitForSelector('tbody tr', { timeout: 20_000 });
     const body = (await page.textContent('body')) ?? '';
     check('the record is gone, leaving the system as found', !body.includes('Verification Land'));

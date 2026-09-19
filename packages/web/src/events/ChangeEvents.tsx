@@ -20,7 +20,20 @@ import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNod
  * becoming a thousand pieces of work.
  */
 
-type ChangeTimes = ReadonlyMap<string, number>;
+/**
+ * When an entity changed, in both clocks.
+ *
+ * `heardAt` is this browser's clock and answers whether a change arrived after
+ * the data was loaded. `serverAt` is the service's and answers which rows
+ * changed, because the rows carry the service's timestamps and marking them
+ * needs the same clock they were written in.
+ */
+interface ChangeTime {
+  readonly heardAt: number;
+  readonly serverAt: string;
+}
+
+type ChangeTimes = ReadonlyMap<string, ChangeTime>;
 
 interface ChangeEventsValue {
   /** When each entity last changed, by this browser's clock. */
@@ -46,12 +59,13 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
       const parsed = JSON.parse((event as MessageEvent<string>).data) as {
         component?: string;
         entity?: string;
+        at?: string;
       };
       if (parsed.component === undefined || parsed.entity === undefined) return;
       const changed = key(parsed.component, parsed.entity);
       setTimes((current) => {
         const next = new Map(current);
-        next.set(changed, Date.now());
+        next.set(changed, { heardAt: Date.now(), serverAt: parsed.at ?? '' });
         return next;
       });
     });
@@ -107,6 +121,18 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
 }
 
 /**
+ * The service's timestamp of the last change to an entity.
+ *
+ * Which rows changed is worked out by comparing this against each row's own
+ * `recorded_at`, so both sides of that comparison are written by the same clock.
+ */
+export function useEntityChangedAt(component: string, entity: string): string | undefined {
+  const context = use(ChangeEventsContext);
+  if (component.length === 0 || entity.length === 0) return undefined;
+  return context?.times.get(key(component, entity))?.serverAt;
+}
+
+/**
  * Whether what a screen is showing is older than what exists.
  *
  * `loadedAt` is when the screen's data was loaded, on this browser's clock, which
@@ -134,5 +160,5 @@ export function useEntityChanged(
   if (context === undefined || loadedAt === 0) return false;
   if (component.length === 0 || entity.length === 0) return false;
   const changedAt = context.times.get(key0);
-  return changedAt !== undefined && changedAt > loadedAt;
+  return changedAt !== undefined && changedAt.heardAt > loadedAt;
 }
