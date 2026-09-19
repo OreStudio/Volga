@@ -31,16 +31,15 @@ import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNod
 interface ChangeTime {
   readonly heardAt: number;
   readonly serverAt: string;
-  /**
-   * The records the service said changed, accumulated since the last reload.
-   *
-   * The event names them, which is better than working them out: a count can be
-   * shown, and the rows can be badged without comparing timestamps at all. A set
-   * rather than a list, so the same record changing twice is one thing to look
-   * at, and a thousand changes from an import are as cheap to hold as one.
-   */
-  readonly ids: ReadonlySet<string>;
 }
+
+/*
+ * The records are not carried.
+ *
+ * The event declares them and the services do not fill them in, so anything built
+ * on them would be a count of nothing. Which rows changed is worked out from the
+ * rows themselves instead, which is the weaker account and the one that works.
+ */
 
 type ChangeTimes = ReadonlyMap<string, ChangeTime>;
 
@@ -71,7 +70,6 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
         component?: string;
         entity?: string;
         at?: string;
-        ids?: readonly string[];
       };
       if (parsed.component === undefined || parsed.entity === undefined) return;
       const changed = key(parsed.component, parsed.entity);
@@ -81,7 +79,6 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
         next.set(changed, {
           heardAt: Date.now(),
           serverAt: parsed.at ?? previous?.serverAt ?? '',
-          ids: new Set([...(previous?.ids ?? []), ...(parsed.ids ?? [])]),
         });
         return next;
       });
@@ -168,10 +165,6 @@ export function useEntityChangedAt(component: string, entity: string): string | 
 export interface EntityChanges {
   /** Whether what is on screen is older than what exists. */
   readonly stale: boolean;
-  /** How many records the service named, which a screen can report. */
-  readonly count: number;
-  /** Those records, so a screen can badge them. */
-  readonly ids: ReadonlySet<string>;
   /** Says the changes have been loaded, so the news is no longer news. */
   readonly clear: () => void;
 }
@@ -204,7 +197,7 @@ export function useEntityChanges(
   }, [context, keyed]);
 
   const empty: EntityChanges = useMemo(
-    () => ({ stale: false, count: 0, ids: new Set(), clear: () => undefined }),
+    () => ({ stale: false, clear: () => undefined }),
     [],
   );
 
@@ -216,8 +209,6 @@ export function useEntityChanges(
 
   return {
     stale: true,
-    count: changedAt.ids.size,
-    ids: changedAt.ids,
     clear: () => context.clear(component, entity),
   };
 }

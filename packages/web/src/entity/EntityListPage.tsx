@@ -162,7 +162,6 @@ export function EntityListPage<Row extends Record<string, unknown>>({
     query.dataUpdatedAt,
   );
   const stale = watchedAs !== undefined && changes.stale;
-  const changedCount = stale ? changes.count : 0;
   /*
    * The rows that moved, by comparison with the last load.
    *
@@ -188,11 +187,8 @@ export function EntityListPage<Row extends Record<string, unknown>>({
         .filter((row) => String(row['recorded_at'] ?? '') > since)
         .map((row) => String(row[meta.keyField] ?? '')),
     );
-    // The service's own account of what changed takes precedence: it knows, and
-    // a comparison of times only infers.
-    for (const id of changes.ids) fromData.add(id);
     return fromData;
-  }, [rows, meta.keyField, changes.ids]);
+  }, [rows, meta.keyField]);
 
   /*
    * The badge fades on its own, as a mail client's does.
@@ -254,16 +250,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           >
             <MaskIcon name="arrowSync" className={cx('size-3.5', stale ? 'text-accent' : 'opacity-70')} />
             {t('entity.refresh')}
-            {/*
-              How many, when the service said. A count is what a mail client
-              gives and what makes the news concrete: "three" is a reason to
-              reload, and "something" is a reason to hesitate.
-            */}
-            {changedCount > 0 && (
-              <span className="rounded-full bg-accent px-1.5 text-[10px] font-medium tabular-nums text-ink-inverse">
-                {changedCount}
-              </span>
-            )}
+
           </Button>
           {/*
             Not rendered rather than disabled: a disabled button invites a
