@@ -86,6 +86,37 @@
  * that becomes annoying within a day — which is why the animation carries an
  * iteration count and the border underneath it does not.
  */
+/*
+ * A control with news behind it.
+ *
+ * A ring that expands and fades, repeating for as long as the news is true and
+ * stopping the moment it is not. A pulse rather than a flash: this can be on
+ * screen for a while, and something that demands attention indefinitely is
+ * something people learn to ignore.
+ */
+@keyframes stale-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+}
+
+.stale-pulse {
+  animation: stale-pulse 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stale-pulse {
+    animation: none;
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-accent) 40%, transparent);
+  }
+}
+
 @keyframes row-changed {
   0%,
   100% {

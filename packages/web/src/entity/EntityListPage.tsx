@@ -219,10 +219,17 @@ export function EntityListPage<Row extends Record<string, unknown>>({
             pending={query.isFetching && !loading}
             pendingLabel={t('accounts.refreshing')}
             title={stale ? t('entity.changed') : undefined}
-            className={stale ? 'border-accent text-ink' : undefined}
+            /*
+             * The control itself says that something changed, which is where a
+             * person already looks when they want newer data. A bar elsewhere on
+             * the screen is an alert, and news is not an alarm.
+             */
+            className={stale ? 'stale-pulse border-accent text-ink' : undefined}
           >
-            <MaskIcon name="arrowSync" className={cx('size-3.5', stale ? 'animate-pulse' : 'opacity-70')} />
+            <MaskIcon name="arrowSync" className={cx('size-3.5', stale ? 'text-accent' : 'opacity-70')} />
             {t('entity.refresh')}
+            {/* A dot, because a colour alone is easy to miss in a busy toolbar. */}
+            {stale && <span className="size-1.5 rounded-full bg-accent" aria-hidden />}
           </Button>
           {/* Not rendered rather than disabled: a disabled button invites a
               question a missing one does not. */}
@@ -232,31 +239,6 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           </Button>
         </div>
       </header>
-
-      {/*
-        Changes are pending, and it says so where it cannot be missed.
-        
-        The reload action carried a tooltip, which is not a notification: it is
-        there only for somebody already looking at the control and wondering. A
-        person who cannot tell that something changed will not go looking, so the
-        news goes at the top of what they are reading.
-      */}
-      {stale && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-accent/40 bg-accent/[0.08] px-3.5 py-2.5">
-          <MaskIcon name="arrowSync" className="size-4 animate-pulse text-accent" />
-          <span className="text-sm text-ink">{t('entity.changedBanner')}</span>
-          <Button
-            variant="primary"
-            size="sm"
-            className="ml-auto"
-            onClick={onReload}
-            pending={query.isFetching}
-            pendingLabel={t('accounts.refreshing')}
-          >
-            {t('entity.refresh')}
-          </Button>
-        </div>
-      )}
 
       {failureMessage !== undefined && (
         <div className="mb-4">
