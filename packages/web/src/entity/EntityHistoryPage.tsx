@@ -114,10 +114,18 @@ export function EntityHistoryPage({
       ) : entries.length === 0 ? (
         <p className="text-sm text-ink-muted">{t('history.empty')}</p>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[minmax(220px,300px)_1fr]">
-          <section>
+        /*
+         * Each pane scrolls on its own within the height of the window.
+         *
+         * A record can have hundreds of versions, and letting the timeline set
+         * the page height means the fields scroll away exactly when there is
+         * most to compare — the reader loses the thing they are reading in order
+         * to move between the things they are reading it against.
+         */
+        <div className="grid gap-5 lg:h-[calc(100vh-15rem)] lg:grid-cols-[minmax(220px,300px)_1fr]">
+          <section className="flex min-h-0 flex-col">
             <h2 className="mb-2 text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
-            <ol className="space-y-1.5">
+            <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
               {entries.map((version, index) => (
                 // Keyed by the same identity the deduplication uses: a version
                 // alone can legitimately appear twice, once per life of the
@@ -166,7 +174,7 @@ export function EntityHistoryPage({
             </ol>
           </section>
 
-          <section className="min-w-0">
+          <section className="min-h-0 min-w-0 lg:overflow-y-auto lg:pr-1">
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <h2 className="text-sm font-medium text-ink-muted">
                 {older === undefined
