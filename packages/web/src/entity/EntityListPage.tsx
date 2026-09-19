@@ -265,12 +265,17 @@ export function EntityListPage<Row extends Record<string, unknown>>({
               </span>
             )}
           </Button>
-          {/* Not rendered rather than disabled: a disabled button invites a
-              question a missing one does not. */}
-          <Button variant="primary" size="sm" disabled title={t('card.notBuilt')}>
-            <MaskIcon name="add" className="size-3.5 opacity-70" />
-            {t('entity.add')}
-          </Button>
+          {/*
+            Not rendered rather than disabled: a disabled button invites a
+            question a missing one does not. An entity that can be created gets a
+            button that works; one that cannot gets no button at all.
+          */}
+          {onCreate !== undefined && (
+            <Button variant="primary" size="sm" onClick={onCreate}>
+              <MaskIcon name="add" className="size-3.5" />
+              {t('entity.add')}
+            </Button>
+          )}
         </div>
       </header>
 
