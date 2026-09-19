@@ -92,6 +92,7 @@ export function CountryListPage(): ReactNode {
         }}
         searchFields={['alpha2_code', 'alpha3_code', 'numeric_code', 'name', 'official_name']}
         searchPlaceholderKey="country.searchPlaceholder"
+        collectionName={t('country.title')}
         watchedAs={{ component: 'refdata', entity: 'country' }}
         {...(failure === undefined ? {} : { failureMessage: failure })}
       />

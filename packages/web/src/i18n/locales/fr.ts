@@ -126,6 +126,8 @@ const fr: SourceCatalogue = {
     page: 'Page {page} sur {pages}',
     pageSize: 'Éléments par page',
     loadAll: 'Tout charger',
+    emptyFiltered: 'Rien ne correspond à ce filtre dans ces {collection}.',
+    loadFailed: 'Impossible de charger ces {collection}.',
     noRecords: 'Aucun enregistrement',
     loading: 'Chargement...',
     first: 'Première',

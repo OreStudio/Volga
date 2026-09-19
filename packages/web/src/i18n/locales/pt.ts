@@ -131,6 +131,8 @@ const pt: SourceCatalogue = {
     page: 'Página {page} de {pages}',
     pageSize: 'Itens por página',
     loadAll: 'Carregar tudo',
+    emptyFiltered: 'Nada corresponde a esse filtro nestes {collection}.',
+    loadFailed: 'Não foi possível carregar estes {collection}.',
     noRecords: 'Sem registos',
     loading: 'A carregar...',
     first: 'Primeira',

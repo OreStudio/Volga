@@ -136,6 +136,8 @@ export const en: SourceCatalogue = {
     page: 'Page {page} of {pages}',
     pageSize: 'Page size',
     loadAll: 'Load all',
+    emptyFiltered: 'Nothing matches that filter in these {collection}.',
+    loadFailed: 'Could not load these {collection}.',
     noRecords: 'No records',
     loading: 'Loading...',
     first: 'First',

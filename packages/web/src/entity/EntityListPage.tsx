@@ -54,6 +54,8 @@ export interface EntityListPageProps<Row> {
    * collection has changed underneath it.
    */
   readonly watchedAs?: { readonly component: string; readonly entity: string };
+  /** What this collection is called, plural, for copy the screen writes itself. */
+  readonly collectionName: string;
   /** The field the type filter groups on, and the values present. */
   readonly filterField?: string;
 }
@@ -82,6 +84,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
   searchPlaceholderKey = 'entity.search',
   failureMessage,
   watchedAs,
+  collectionName,
   filterField,
 }: EntityListPageProps<Row>): ReactNode {
   const { t, plural } = useTranslation();
@@ -275,7 +278,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
       {query.isError && (
         <div className="mb-4">
           <Notice tone="error">
-            {t('accounts.failed')}{' '}
+            {t('entity.loadFailed', { collection: collectionName })}{' '}
             <button type="button" onClick={onReload} className="underline hover:text-ink">
               {t('feedback.retry')}
             </button>
@@ -334,7 +337,9 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           {...(rowActions.length === 0 ? {} : { rowActions })}
           changed={badgesVisible ? marked : new Set()}
           loading={loading}
-          emptyMessage={isFiltered ? t('accounts.empty') : t('entity.noRecords')}
+          emptyMessage={
+            isFiltered ? t('entity.emptyFiltered', { collection: collectionName }) : t('entity.noRecords')
+          }
         />
       </div>
 
