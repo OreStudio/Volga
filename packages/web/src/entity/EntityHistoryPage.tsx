@@ -149,13 +149,21 @@ export function EntityHistoryPage({
          * most to compare — the reader loses the thing they are reading in order
          * to move between the things they are reading it against.
          */
+        /*
+         * One scrollbar, and it is the page's.
+         *
+         * Two panes scrolling inside a scrolling page is three scrollbars where
+         * one will do, and the inner one is small, awkward and unnecessary. The
+         * list flows with the page; the comparison is pinned, so it stays where
+         * the reader is looking while the list moves past it.
+         */
         <div
           className={cx(
-            'grid gap-5 lg:h-[calc(100vh-15rem)]',
+            'grid items-start gap-5',
             timelineShown ? 'lg:grid-cols-[minmax(170px,210px)_1fr]' : 'lg:grid-cols-1',
           )}
         >
-          <section className={cx('min-h-0 flex-col', timelineShown ? 'flex' : 'hidden')}>
+          <section className={cx('flex-col', timelineShown ? 'flex' : 'hidden')}>
             <div className="mb-2 flex items-center gap-2">
               <h2 className="text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
               {/*
@@ -194,7 +202,7 @@ export function EntityHistoryPage({
                 }
               }}
               aria-label={t('history.timeline')}
-              className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="space-y-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               {entries.map((version, index) => (
                 // Keyed by the same identity the deduplication uses: a version
@@ -244,7 +252,7 @@ export function EntityHistoryPage({
             </ol>
           </section>
 
-          <section className="min-h-0 min-w-0 lg:overflow-y-auto lg:pr-1">
+          <section className="min-w-0 lg:sticky lg:top-4">
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <h2 className="text-sm font-medium text-ink-muted">
                 {older === undefined
