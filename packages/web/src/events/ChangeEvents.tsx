@@ -31,6 +31,15 @@ import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNod
 interface ChangeTime {
   readonly heardAt: number;
   readonly serverAt: string;
+  /**
+   * The records the service said changed, accumulated since the last reload.
+   *
+   * The event names them, which is better than working them out: a count can be
+   * shown, and the rows can be badged without comparing timestamps at all. A set
+   * rather than a list, so the same record changing twice is one thing to look
+   * at, and a thousand changes from an import are as cheap to hold as one.
+   */
+  readonly ids: ReadonlySet<string>;
 }
 
 type ChangeTimes = ReadonlyMap<string, ChangeTime>;
@@ -40,6 +49,8 @@ interface ChangeEventsValue {
   readonly times: ChangeTimes;
   /** Declares what the current screen is watching. */
   readonly watch: (watches: readonly string[]) => void;
+  /** Forgets what has been reported, because it has now been loaded. */
+  readonly clear: (component: string, entity: string) => void;
 }
 
 const ChangeEventsContext = createContext<ChangeEventsValue | undefined>(undefined);
@@ -60,12 +71,18 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
         component?: string;
         entity?: string;
         at?: string;
+        ids?: readonly string[];
       };
       if (parsed.component === undefined || parsed.entity === undefined) return;
       const changed = key(parsed.component, parsed.entity);
       setTimes((current) => {
+        const previous = current.get(changed);
         const next = new Map(current);
-        next.set(changed, { heardAt: Date.now(), serverAt: parsed.at ?? '' });
+        next.set(changed, {
+          heardAt: Date.now(),
+          serverAt: parsed.at ?? previous?.serverAt ?? '',
+          ids: new Set([...(previous?.ids ?? []), ...(parsed.ids ?? [])]),
+        });
         return next;
       });
     });
@@ -99,6 +116,15 @@ export function ChangeEventsProvider({ children }: { readonly children: ReactNod
   const value = useMemo<ChangeEventsValue>(
     () => ({
       times,
+      clear: (component, entity) => {
+        setTimes((current) => {
+          const existing = current.get(key(component, entity));
+          if (existing === undefined) return current;
+          const next = new Map(current);
+          next.delete(key(component, entity));
+          return next;
+        });
+      },
       watch: (watches) => {
         watched.current = watches;
         // A screen that has just arrived is watching something new.
@@ -139,11 +165,31 @@ export function useEntityChangedAt(component: string, entity: string): string | 
  * React Query already knows. Nothing reloads on its own: the screen is told it is
  * out of date and a person decides when to bring the changes in.
  */
+export interface EntityChanges {
+  /** Whether what is on screen is older than what exists. */
+  readonly stale: boolean;
+  /** How many records the service named, which a screen can report. */
+  readonly count: number;
+  /** Those records, so a screen can badge them. */
+  readonly ids: ReadonlySet<string>;
+  /** Says the changes have been loaded, so the news is no longer news. */
+  readonly clear: () => void;
+}
+
 export function useEntityChanged(
   component: string,
   entity: string,
   loadedAt: number,
 ): boolean {
+  return useEntityChanges(component, entity, loadedAt).stale;
+}
+
+/** What a screen knows about changes to the entity it is showing. */
+export function useEntityChanges(
+  component: string,
+  entity: string,
+  loadedAt: number,
+): EntityChanges {
   const context = use(ChangeEventsContext);
   const key0 = key(component, entity);
 
@@ -157,8 +203,21 @@ export function useEntityChanged(
     if (keyed.length > 0) context?.watch(keyed);
   }, [context, keyed]);
 
-  if (context === undefined || loadedAt === 0) return false;
-  if (component.length === 0 || entity.length === 0) return false;
+  const empty: EntityChanges = useMemo(
+    () => ({ stale: false, count: 0, ids: new Set(), clear: () => undefined }),
+    [],
+  );
+
+  if (context === undefined || loadedAt === 0) return empty;
+  if (component.length === 0 || entity.length === 0) return empty;
+
   const changedAt = context.times.get(key0);
-  return changedAt !== undefined && changedAt.heardAt > loadedAt;
+  if (changedAt === undefined || changedAt.heardAt <= loadedAt) return empty;
+
+  return {
+    stale: true,
+    count: changedAt.ids.size,
+    ids: changedAt.ids,
+    clear: () => context.clear(component, entity),
+  };
 }

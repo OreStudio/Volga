@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
-import { useEntityChanged } from '../events/ChangeEvents.js';
+import { useEntityChanges } from '../events/ChangeEvents.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { useTranslation } from '../i18n/Provider.js';
 import type { EntityMeta } from '../generated/ui-contract.js';
@@ -156,12 +156,13 @@ export function EntityListPage<Row extends Record<string, unknown>>({
    * worse than a list that is briefly out of date, and a person is the one who
    * knows whether they are finished with what is on screen.
    */
-  const changed = useEntityChanged(
+  const changes = useEntityChanges(
     watchedAs?.component ?? '',
     watchedAs?.entity ?? '',
     query.dataUpdatedAt,
   );
-  const stale = watchedAs !== undefined && changed;
+  const stale = watchedAs !== undefined && changes.stale;
+  const changedCount = stale ? changes.count : 0;
   /*
    * The rows that moved, by comparison with the last load.
    *
@@ -182,12 +183,33 @@ export function EntityListPage<Row extends Record<string, unknown>>({
   const marked = useMemo(() => {
     const since = previousNewest.current;
     if (since === undefined || since.length === 0) return new Set<string>();
-    return new Set(
+    const fromData = new Set(
       rows
         .filter((row) => String(row['recorded_at'] ?? '') > since)
         .map((row) => String(row[meta.keyField] ?? '')),
     );
-  }, [rows, meta.keyField]);
+    // The service's own account of what changed takes precedence: it knows, and
+    // a comparison of times only infers.
+    for (const id of changes.ids) fromData.add(id);
+    return fromData;
+  }, [rows, meta.keyField, changes.ids]);
+
+  /*
+   * The badge fades on its own, as a mail client's does.
+   *
+   * It is there to catch the eye of somebody who was looking when the change
+   * arrived. Somebody who was not, and comes back later, wants the list as it
+   * stands rather than a week of badges — and the reload control is still saying
+   * there is something to bring in, which is the part that persists.
+   */
+  const badgeKey = Array.from(marked).sort().join(',');
+  const [badgesVisible, setBadgesVisible] = useState(true);
+  useEffect(() => {
+    setBadgesVisible(true);
+    if (badgeKey.length === 0) return undefined;
+    const timer = setTimeout(() => setBadgesVisible(false), 6_000);
+    return () => clearTimeout(timer);
+  }, [badgeKey]);
 
   // Advanced after the marks have been taken, so the comparison is always
   // against the load before this one.
@@ -215,7 +237,11 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           <Button
             variant="secondary"
             size="sm"
-            onClick={onReload}
+            onClick={() => {
+              // Reloading is what the news was about, so the news is answered.
+              changes.clear();
+              onReload();
+            }}
             pending={query.isFetching && !loading}
             pendingLabel={t('accounts.refreshing')}
             title={stale ? t('entity.changed') : undefined}
@@ -228,8 +254,16 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           >
             <MaskIcon name="arrowSync" className={cx('size-3.5', stale ? 'text-accent' : 'opacity-70')} />
             {t('entity.refresh')}
-            {/* A dot, because a colour alone is easy to miss in a busy toolbar. */}
-            {stale && <span className="size-1.5 rounded-full bg-accent" aria-hidden />}
+            {/*
+              How many, when the service said. A count is what a mail client
+              gives and what makes the news concrete: "three" is a reason to
+              reload, and "something" is a reason to hesitate.
+            */}
+            {changedCount > 0 && (
+              <span className="rounded-full bg-accent px-1.5 text-[10px] font-medium tabular-nums text-ink-inverse">
+                {changedCount}
+              </span>
+            )}
           </Button>
           {/* Not rendered rather than disabled: a disabled button invites a
               question a missing one does not. */}
@@ -306,7 +340,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
           rowKey={(row) => String(row[meta.keyField] ?? '')}
           {...(onOpen === undefined ? {} : { onOpen })}
           {...(rowActions.length === 0 ? {} : { rowActions })}
-          changed={marked}
+          changed={badgesVisible ? marked : new Set()}
           loading={loading}
           emptyMessage={isFiltered ? t('accounts.empty') : t('entity.noRecords')}
         />

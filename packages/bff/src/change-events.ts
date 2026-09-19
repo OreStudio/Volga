@@ -31,6 +31,8 @@ export interface ChangeEvent {
   readonly entity: string;
   /** When the change happened, server-side. */
   readonly at: string;
+  /** The records that changed, as the service named them. */
+  readonly ids: readonly string[];
 }
 
 /**
@@ -119,8 +121,13 @@ export class ChangeEventRegistry {
       const listeners = new Map<string, ChangeListener>();
       const stop = this.#client.subscribeToEvents(
         eventSubject(watch.component, watch.entity),
-        (at) => {
-          const event: ChangeEvent = { component: watch.component, entity: watch.entity, at };
+        (change) => {
+          const event: ChangeEvent = {
+            component: watch.component,
+            entity: watch.entity,
+            at: change.at,
+            ids: change.ids,
+          };
           for (const listener of listeners.values()) listener(event);
         },
       );

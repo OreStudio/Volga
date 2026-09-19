@@ -309,17 +309,20 @@ export class OresClient {
    * Listens for changes to an entity.
    *
    * The payload is a change notification: when it happened, which records, and
-   * whose they are. Only the time is handed on, because the time is the whole
-   * message as far as a screen is concerned — a screen needs to know that what
-   * it is showing is older than what exists, not which rows moved. The rows are
-   * worked out after the reload, from the data.
+   * whose they are. The time and the records are handed on. The time says whether
+   * what is on screen is older than what exists; the records say how many, so a
+   * screen can say so, and which, so it can badge them without comparing
+   * timestamps.
    *
    * Nothing is authenticated here. These are published events, not replies, so
    * there is no session to present and no failure to report: a subscription that
    * cannot be made is a screen that does not hear about changes, which is the
    * behaviour it had before.
    */
-  subscribeToEvents(relative: string, onEvent: (at: string) => void): () => void {
+  subscribeToEvents(
+    relative: string,
+    onEvent: (change: { readonly at: string; readonly ids: readonly string[] }) => void,
+  ): () => void {
     const subscribe = this.#transport.subscribe;
     if (subscribe === undefined) {
       return () => undefined;
@@ -327,7 +330,7 @@ export class OresClient {
     return subscribe.call(this.#transport, relative, (payload) => {
       try {
         const decoded = this.#codec.decodeAs(payload, changeEventSchema);
-        onEvent(decoded.timestamp);
+        onEvent({ at: decoded.timestamp, ids: decoded.alpha2_codes });
       } catch {
         // An event this build does not understand is one it cannot act on.
       }
