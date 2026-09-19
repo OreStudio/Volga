@@ -4,8 +4,10 @@ import { WireCodec } from './codec.js';
 import type { PartySummary } from './domain.js';
 import {
   NotAuthenticatedError,
+  ServerError,
   SessionExpiredError,
   type ProtocolError,
+  type ServerErrorCode,
 } from './errors.js';
 import {
   SUBJECTS,
@@ -453,10 +455,7 @@ export class OresClient {
       await this.refresh();
       return this.#retryAuthenticated(subject, body, schema, options.timeoutMs);
     }
-    throw new SessionExpiredError(
-      serverError === 'max_session_exceeded' ? 'max_session_exceeded' : 'token_expired',
-      subject,
-    );
+    throw errorForServerCode(serverError, subject);
   }
 
   async #retryAuthenticated<Schema extends z.ZodType>(
@@ -474,10 +473,7 @@ export class OresClient {
     );
     const serverError = serverErrorCode(reply.headers);
     if (serverError !== undefined) {
-      throw new SessionExpiredError(
-        serverError === 'max_session_exceeded' ? 'max_session_exceeded' : 'token_expired',
-        subject,
-      );
+      throw errorForServerCode(serverError, subject);
     }
     return this.#codec.decodeAs(reply.body, schema);
   }
@@ -521,9 +517,39 @@ const changeEventSchema = z.object({
   tenant_id: z.string().default(''),
 });
 
+/**
+ * The failure a server error code means.
+ *
+ * Every code used to be reported as an expired session, including a refusal to
+ * authorise. That is a costly lie: an expired session is something a person can
+ * act on by signing in again, and a refusal is not, so the one thing the message
+ * told them to do was the one thing that could not help. It also cost real time
+ * here, where a permission problem read as a session problem for hours.
+ *
+ * The codes the server can send are enumerated, so a code with no case here is a
+ * protocol change rather than a runtime surprise, and it is carried through as
+ * itself rather than renamed.
+ */
+function errorForServerCode(code: ServerErrorCode, subject: string): ProtocolError {
+  switch (code) {
+    case 'token_expired':
+    case 'max_session_exceeded':
+      return new SessionExpiredError(code, subject);
+    case 'unauthorized':
+      return new NotAuthenticatedError(`The server requires authentication for ${subject}`);
+    default:
+      // `forbidden` and `bad_request` are the server understanding the request
+      // and declining it, which is not a session problem.
+      return new ServerError(code, subject);
+  }
+}
+
 /** Reads the `X-Error` header, if the server set one. */
-function serverErrorCode(headers: Readonly<Record<string, string>>): string | undefined {
-  return headers['X-Error'];
+function serverErrorCode(
+  headers: Readonly<Record<string, string>>,
+): ServerErrorCode | undefined {
+  const code = headers['X-Error'];
+  return code === undefined ? undefined : (code as ServerErrorCode);
 }
 
 function toActive(reply: LoginResponse, party: PartySummary): ActiveSession {

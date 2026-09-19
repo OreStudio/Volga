@@ -68,9 +68,20 @@ export function toHttpFailure(error: unknown): HttpFailure {
     return notAuthenticated();
   }
   if (error instanceof ServerError) {
-    return error.code === 'forbidden'
-      ? new HttpFailure(403, { code: 'forbidden', message: 'You do not have access to this.' })
-      : new HttpFailure(502, { code: 'upstream-unavailable', message: 'The server refused the request.' });
+    if (error.code === 'forbidden') {
+      return new HttpFailure(403, { code: 'forbidden', message: 'You do not have access to this.' });
+    }
+    /*
+     * The server's own code, in the message.
+     *
+     * A refusal with no reason is a refusal nobody can act on: an operator sees
+     * "the server refused" and has nothing to look up. The code is the one piece
+     * of the server's answer that says which rule was applied.
+     */
+    return new HttpFailure(502, {
+      code: 'upstream-unavailable',
+      message: `The server refused the request (${error.code}).`,
+    });
   }
   if (error instanceof OperationFailedError) {
     return new HttpFailure(409, { code: 'invalid-request', message: error.message });
