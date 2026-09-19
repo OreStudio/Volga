@@ -67,7 +67,20 @@ export function EntityHistoryPage({
 }: EntityHistoryPageProps): ReactNode {
   const { t } = useTranslation();
   // Newest first, so the default selection is the two most recent versions.
-  const [selected, setSelected] = useState(0);
+  /*
+   * Two versions, chosen independently.
+   *
+   * Comparing only neighbours is the smallest case of the thing people actually
+   * want, which is "this one against that one" — the record as it stands against
+   * how it stood five versions ago. So the pair is chosen rather than implied,
+   * and stepping moves both.
+   *
+   * Indexes into the newest-first list, so the older version has the larger
+   * index of the two.
+   */
+  const [newerIndex, setNewerIndex] = useState(0);
+  const [olderIndex, setOlderIndex] = useState(1);
+  const selected = newerIndex;
   const [showAll, setShowAll] = useState(false);
   const [confirmingRevert, setConfirmingRevert] = useState(false);
 
@@ -113,15 +126,28 @@ export function EntityHistoryPage({
    */
   const WINDOW = 7;
   const half = Math.floor(WINDOW / 2);
-  const windowStart = Math.max(0, Math.min(entries.length - WINDOW, selected - half));
+  const windowStart = Math.max(0, Math.min(entries.length - WINDOW, newerIndex - half));
   const windowed = entries.slice(windowStart, windowStart + WINDOW);
 
-  const older = entries[selected + 1];
-  const newer = entries[selected];
+  const newer = entries[newerIndex];
+  const older = entries[olderIndex];
+
+  /** Moves the pair one version, keeping them the same distance apart. */
+  function step(direction: number): void {
+    const span = olderIndex - newerIndex;
+    const nextNewer = Math.min(Math.max(0, newerIndex + direction), entries.length - 1);
+    const nextOlder = Math.min(entries.length - 1, nextNewer + Math.max(1, span));
+    if (nextNewer === newerIndex) return;
+    setNewerIndex(nextNewer);
+    setOlderIndex(nextOlder);
+  }
+  // Two versions can only be compared one way round, and saying so is better
+  // than showing a diff that reads backwards.
+  const outOfOrder = older !== undefined && newer !== undefined && olderIndex <= newerIndex;
 
   const rows = useMemo(
-    () => (older === undefined || newer === undefined ? [] : diff(older, newer, meta.columns)),
-    [older, newer, meta.columns],
+    () => (older === undefined || newer === undefined || outOfOrder ? [] : diff(older, newer, meta.columns)),
+    [older, newer, meta.columns, outOfOrder],
   );
   const shown = showAll ? rows : rows.filter((row) => row.changed);
 
@@ -175,7 +201,7 @@ export function EntityHistoryPage({
                 {t('history.timeline')}
                 {/* A window hides the rest, so it says how much there is. */}
                 <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
-                  {selected + 1}/{entries.length}
+                  {newerIndex + 1}/{entries.length}
                 </span>
               </h2>
               {/*
@@ -186,16 +212,14 @@ export function EntityHistoryPage({
               <div className="ml-auto flex items-center gap-1">
                 <StepButton
                   label={t('history.newer')}
-                  disabled={selected === 0}
-                  onClick={() => setSelected((current) => Math.max(0, current - 1))}
+                  disabled={newerIndex === 0}
+                  onClick={() => step(-1)}
                   direction="up"
                 />
                 <StepButton
                   label={t('history.older')}
-                  disabled={selected >= entries.length - 1}
-                  onClick={() =>
-                    setSelected((current) => Math.min(entries.length - 1, current + 1))
-                  }
+                  disabled={olderIndex >= entries.length - 1}
+                  onClick={() => step(1)}
                   direction="down"
                 />
               </div>
@@ -207,10 +231,10 @@ export function EntityHistoryPage({
               onKeyDown={(event) => {
                 if (event.key === 'ArrowDown' || event.key === 'j') {
                   event.preventDefault();
-                  setSelected((current) => Math.min(entries.length - 1, current + 1));
+                  step(1);
                 } else if (event.key === 'ArrowUp' || event.key === 'k') {
                   event.preventDefault();
-                  setSelected((current) => Math.max(0, current - 1));
+                  step(-1);
                 }
               }}
               aria-label={t('history.timeline')}
@@ -225,7 +249,12 @@ export function EntityHistoryPage({
                 <li key={entryKey(version, meta.columns)}>
                   <button
                     type="button"
-                    onClick={() => setSelected(index)}
+                    // Choosing a version previews it against the one before, and
+                    // the selects can then take it anywhere.
+                    onClick={() => {
+                      setNewerIndex(index);
+                      setOlderIndex(Math.min(entries.length - 1, index + 1));
+                    }}
                     aria-current={index === selected}
                     className={cx(
                       'w-full rounded-[var(--radius-card)] border px-3 py-2 text-left transition-colors',
@@ -269,11 +298,46 @@ export function EntityHistoryPage({
 
           <section className="min-w-0 lg:sticky lg:top-4">
             <div className="mb-2 flex flex-wrap items-center gap-3">
-              <h2 className="text-sm font-medium text-ink-muted">
-                {older === undefined
-                  ? t('history.initial')
-                  : t('history.comparing', { from: older.version, to: newer?.version ?? 0 })}
-              </h2>
+              {/*
+                Any two versions, not only neighbours.
+                The question a history gets asked is "what is different now from
+                how it was then", and "then" is rarely the version before.
+              */}
+              <div className="flex items-center gap-1.5 text-sm text-ink-muted">
+                <label className="flex items-center gap-1">
+                  <span className="text-xs">{t('history.from')}</span>
+                  <select
+                    value={olderIndex}
+                    onChange={(event) => setOlderIndex(Number(event.target.value))}
+                    aria-label={t('history.from')}
+                    className="h-7 rounded-md border border-line bg-bg-secondary px-1.5 text-xs text-ink focus:border-line-strong focus:outline-none"
+                  >
+                    {entries.map((version, index) => (
+                      <option key={`from-${index}`} value={index}>
+                        v{version.version}
+                        {index === 0 ? ` (${t('history.current')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className="text-ink-faint">→</span>
+                <label className="flex items-center gap-1">
+                  <span className="text-xs">{t('history.to')}</span>
+                  <select
+                    value={newerIndex}
+                    onChange={(event) => setNewerIndex(Number(event.target.value))}
+                    aria-label={t('history.to')}
+                    className="h-7 rounded-md border border-line bg-bg-secondary px-1.5 text-xs text-ink focus:border-line-strong focus:outline-none"
+                  >
+                    {entries.map((version, index) => (
+                      <option key={`to-${index}`} value={index}>
+                        v{version.version}
+                        {index === 0 ? ` (${t('history.current')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="ml-auto flex items-center gap-1 rounded-md border border-line p-0.5">
                 {([false, true] as const).map((all) => (
                   <button
@@ -291,7 +355,11 @@ export function EntityHistoryPage({
               </div>
             </div>
 
-            {rows.length === 0 ? (
+            {outOfOrder ? (
+              <p className="rounded-[var(--radius-card)] border border-line bg-bg-secondary px-4 py-6 text-center text-sm text-ink-muted">
+                {t('history.outOfOrder')}
+              </p>
+            ) : rows.length === 0 ? (
               <p className="rounded-[var(--radius-card)] border border-line bg-bg-secondary px-4 py-6 text-center text-sm text-ink-muted">
                 {t('history.noChanges')}
               </p>
