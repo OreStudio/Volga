@@ -293,6 +293,8 @@ const fr: SourceCatalogue = {
   },
   history: {
     description: 'Toutes les versions de cet enregistrement, la plus récente en premier.',
+    newer: 'Plus récente',
+    older: 'Plus ancienne',
     timeline: 'Chronologie',
     current: 'actuelle',
     empty: "Cet enregistrement n'a pas d'historique.",

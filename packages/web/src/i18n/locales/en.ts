@@ -302,6 +302,8 @@ export const en: SourceCatalogue = {
   },
   history: {
     description: 'Every version of this record, newest first.',
+    newer: 'Newer',
+    older: 'Older',
     timeline: 'Timeline',
     current: 'current',
     empty: 'This record has no history.',

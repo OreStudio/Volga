@@ -124,8 +124,46 @@ export function EntityHistoryPage({
          */
         <div className="grid gap-5 lg:h-[calc(100vh-15rem)] lg:grid-cols-[minmax(220px,300px)_1fr]">
           <section className="flex min-h-0 flex-col">
-            <h2 className="mb-2 text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
-            <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+            <div className="mb-2 flex items-center gap-2">
+              <h2 className="text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
+              {/*
+                Stepping, because a scrollbar makes a person hunt.
+                Going from v12 to v11 by aiming at a scrollbar is work; by
+                pressing a key it is not, and the comparison follows.
+              */}
+              <div className="ml-auto flex items-center gap-1">
+                <StepButton
+                  label={t('history.newer')}
+                  disabled={selected === 0}
+                  onClick={() => setSelected((current) => Math.max(0, current - 1))}
+                  direction="up"
+                />
+                <StepButton
+                  label={t('history.older')}
+                  disabled={selected >= entries.length - 1}
+                  onClick={() =>
+                    setSelected((current) => Math.min(entries.length - 1, current + 1))
+                  }
+                  direction="down"
+                />
+              </div>
+            </div>
+            <ol
+              // Focusable so the arrows work without a mouse, and so a person
+              // tabbing through the screen lands somewhere useful.
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowDown' || event.key === 'j') {
+                  event.preventDefault();
+                  setSelected((current) => Math.min(entries.length - 1, current + 1));
+                } else if (event.key === 'ArrowUp' || event.key === 'k') {
+                  event.preventDefault();
+                  setSelected((current) => Math.max(0, current - 1));
+                }
+              }}
+              aria-label={t('history.timeline')}
+              className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
               {entries.map((version, index) => (
                 // Keyed by the same identity the deduplication uses: a version
                 // alone can legitimately appear twice, once per life of the
@@ -271,6 +309,41 @@ export function EntityHistoryPage({
  * same green and red used for success and failure elsewhere, and nothing else on
  * the screen uses them.
  */
+/** One step through the versions, by button. */
+function StepButton({
+  label,
+  disabled,
+  onClick,
+  direction,
+}: {
+  readonly label: string;
+  readonly disabled: boolean;
+  readonly onClick: () => void;
+  readonly direction: 'up' | 'down';
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className="rounded-md border border-line p-1 text-ink-muted transition-colors hover:text-ink disabled:opacity-35 disabled:hover:text-ink-muted"
+    >
+      <svg viewBox="0 0 16 16" className="size-3" aria-hidden>
+        <path
+          d={direction === 'up' ? 'M8 11V5M4.5 8.5L8 5l3.5 3.5' : 'M8 5v6M4.5 7.5L8 11l3.5-3.5'}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+
 function Value({
   segments,
   side,
