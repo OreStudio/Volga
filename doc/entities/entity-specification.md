@@ -10,6 +10,10 @@ document is the checklist.
 component declaration contains, is `component-specification.md`. This document
 covers the screens themselves.
 
+**What is not yet built** is `gaps.md`: this specification read against the
+reference entity, with every requirement judged and the open gaps listed. Read it
+before planning work, and update it as the gaps close.
+
 **What this document is.** It is derived from the Qt client, which already
 carries the accumulated decisions, but it is not a transcription of it. The Qt
 client contains two archetypes and one is better than the other. Where they
