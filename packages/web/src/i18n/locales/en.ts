@@ -127,6 +127,7 @@ export const en: SourceCatalogue = {
     saving: 'Saving...',
     close: 'Close',
     cancel: 'Cancel',
+    changed: 'This list has changed on the server. Reload to see it.',
     refresh: 'Refresh',
     history: 'History',
     search: 'Search',

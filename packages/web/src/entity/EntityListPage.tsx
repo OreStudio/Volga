@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { DataTable, type RowAction } from './DataTable.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
+import { useEntityChanged } from '../events/ChangeEvents.js';
 import { Button, Notice, cx } from '../ui/Primitives.js';
 import { useTranslation } from '../i18n/Provider.js';
 import type { EntityMeta } from '../generated/ui-contract.js';
@@ -48,6 +49,11 @@ export interface EntityListPageProps<Row> {
    * layout, and a modal for a refused delete is heavier than the news deserves.
    */
   readonly failureMessage?: string;
+  /**
+   * The component and entity this list is of, so it can be told when the
+   * collection has changed underneath it.
+   */
+  readonly watchedAs?: { readonly component: string; readonly entity: string };
   /** The field the type filter groups on, and the values present. */
   readonly filterField?: string;
 }
@@ -75,6 +81,7 @@ export function EntityListPage<Row extends Record<string, unknown>>({
   searchFields = [],
   searchPlaceholderKey = 'entity.search',
   failureMessage,
+  watchedAs,
   filterField,
 }: EntityListPageProps<Row>): ReactNode {
   const { t, plural } = useTranslation();
@@ -142,6 +149,20 @@ export function EntityListPage<Row extends Record<string, unknown>>({
     onPageSizeChange(totalCount);
   }, [searching, wholeCollectionLoaded, totalCount, onPageSizeChange]);
 
+  /*
+   * Stale, and it says so on the reload action.
+   *
+   * Never a reload by itself: a list that jumps while somebody is reading it is
+   * worse than a list that is briefly out of date, and a person is the one who
+   * knows whether they are finished with what is on screen.
+   */
+  const changed = useEntityChanged(
+    watchedAs?.component ?? '',
+    watchedAs?.entity ?? '',
+    query.dataUpdatedAt,
+  );
+  const stale = watchedAs !== undefined && changed;
+
   const pages = Math.max(1, Math.ceil(totalCount / pageSize));
   const loading = query.isPending;
   const isFiltered = search.trim().length > 0 || filter.length > 0;
@@ -160,8 +181,10 @@ export function EntityListPage<Row extends Record<string, unknown>>({
             onClick={onReload}
             pending={query.isFetching && !loading}
             pendingLabel={t('accounts.refreshing')}
+            title={stale ? t('entity.changed') : undefined}
+            className={stale ? 'border-accent text-ink' : undefined}
           >
-            <MaskIcon name="arrowSync" className="size-3.5 opacity-70" />
+            <MaskIcon name="arrowSync" className={cx('size-3.5', stale ? 'animate-pulse' : 'opacity-70')} />
             {t('entity.refresh')}
           </Button>
           {/* Not rendered rather than disabled: a disabled button invites a

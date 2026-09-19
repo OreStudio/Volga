@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router';
 import { Sidebar } from './Sidebar.js';
 import { TopBar } from './TopBar.js';
 import { PageCrumbProvider } from './PageCrumb.js';
+import { ChangeEventsProvider } from '../events/ChangeEvents.js';
 import { cx } from '../ui/Primitives.js';
 
 /**
@@ -23,6 +24,7 @@ export function AppShell(): ReactNode {
     <div className="flex h-full flex-col bg-bg-primary">
       {/* The bar and the screen share the screen's name, so the bar can say what
           the route only knows the identifier of. */}
+      <ChangeEventsProvider>
       <PageCrumbProvider>
         <TopBar onOpenMenu={() => setMenuOpen((open) => !open)} />
 
@@ -66,6 +68,7 @@ export function AppShell(): ReactNode {
         </main>
         </div>
       </PageCrumbProvider>
+      </ChangeEventsProvider>
     </div>
   );
 }
