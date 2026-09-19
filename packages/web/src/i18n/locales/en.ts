@@ -304,6 +304,8 @@ export const en: SourceCatalogue = {
     description: 'Every version of this record, newest first.',
     newer: 'Newer',
     older: 'Older',
+    revert: 'Revert',
+    revertBody: "Are you sure you want to revert '{name}' from version {from} back to version {to}? This will create a new version with the data from version {to}.",
     timeline: 'Timeline',
     current: 'current',
     empty: 'This record has no history.',

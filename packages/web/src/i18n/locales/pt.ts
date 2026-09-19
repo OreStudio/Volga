@@ -300,6 +300,8 @@ const pt: SourceCatalogue = {
     description: 'Todas as versões deste registo, da mais recente para a mais antiga.',
     newer: 'Mais recente',
     older: 'Mais antiga',
+    revert: 'Reverter',
+    revertBody: "Tem a certeza de que pretende reverter '{name}' da versão {from} para a versão {to}? Isto criará uma nova versão com os dados da versão {to}.",
     timeline: 'Cronologia',
     current: 'atual',
     empty: 'Este registo não tem histórico.',

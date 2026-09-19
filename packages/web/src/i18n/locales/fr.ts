@@ -295,6 +295,8 @@ const fr: SourceCatalogue = {
     description: 'Toutes les versions de cet enregistrement, la plus récente en premier.',
     newer: 'Plus récente',
     older: 'Plus ancienne',
+    revert: 'Rétablir',
+    revertBody: "Voulez-vous vraiment rétablir '{name}' de la version {from} à la version {to} ? Cela créera une nouvelle version avec les données de la version {to}.",
     timeline: 'Chronologie',
     current: 'actuelle',
     empty: "Cet enregistrement n'a pas d'historique.",

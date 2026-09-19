@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from '../i18n/Provider.js';
 import { MaskIcon } from '../ui/icons/MaskIcon.js';
 import { Notice, cx } from '../ui/Primitives.js';
+import { ConfirmDialog } from './ConfirmDialog.js';
 import { diffValues, type Segment } from './diff.js';
 import type { ColumnMeta, EntityMeta } from '../generated/ui-contract.js';
 
@@ -26,6 +27,13 @@ export interface HistoryVersion {
   readonly changeCommentary: string;
   /** The record's own fields, by wire name, for the diff. */
   readonly values: Readonly<Record<string, unknown>>;
+  /**
+   * The record as the service sent it, for anything that has to write it back.
+   *
+   * Carried rather than looked up again, because a version number repeats when a
+   * record is deleted and created again, so a number does not identify a version.
+   */
+  readonly wire?: unknown;
 }
 
 export interface EntityHistoryPageProps {
@@ -36,6 +44,14 @@ export interface EntityHistoryPageProps {
   readonly failed: boolean;
   readonly onRetry: () => void;
   readonly onOpenVersion: (version: number) => void;
+  /**
+   * Puts the record back to a version, by writing it again.
+   *
+   * Absent where the entity cannot be written, in which case no action is shown.
+   */
+  readonly onRevert?: (version: HistoryVersion) => void;
+  /** What the record is called, for the confirmation. */
+  readonly recordName?: string;
 }
 
 export function EntityHistoryPage({
@@ -46,11 +62,14 @@ export function EntityHistoryPage({
   failed,
   onRetry,
   onOpenVersion,
+  onRevert,
+  recordName,
 }: EntityHistoryPageProps): ReactNode {
   const { t } = useTranslation();
   // Newest first, so the default selection is the two most recent versions.
   const [selected, setSelected] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const [confirmingRevert, setConfirmingRevert] = useState(false);
 
 
   /*
@@ -316,6 +335,21 @@ export function EntityHistoryPage({
               </div>
             )}
 
+            {/*
+              Reverting writes the record again from this version, so the newest
+              version has nothing to revert to and offers nothing.
+            */}
+            {onRevert !== undefined && newer !== undefined && older !== undefined && (
+              <button
+                type="button"
+                onClick={() => setConfirmingRevert(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
+              >
+                <MaskIcon name="arrowRotateCounterclockwise" className="size-3.5" />
+                {t('history.revert')}
+              </button>
+            )}
+
             {newer !== undefined && (
               <button
                 type="button"
@@ -329,6 +363,24 @@ export function EntityHistoryPage({
           </section>
         </div>
       )}
+      {confirmingRevert && newer !== undefined && older !== undefined && (
+        <ConfirmDialog
+          title={t('history.revert')}
+          body={t('history.revertBody', {
+            name: recordName ?? '',
+            from: newer.version,
+            to: older.version,
+          })}
+          confirmLabel={t('history.revert')}
+          pending={false}
+          onCancel={() => setConfirmingRevert(false)}
+          onConfirm={() => {
+            setConfirmingRevert(false);
+            onRevert?.(older);
+          }}
+        />
+      )}
+
     </div>
   );
 }
