@@ -300,6 +300,8 @@ const pt: SourceCatalogue = {
     description: 'Todas as versões deste registo, da mais recente para a mais antiga.',
     newer: 'Mais recente',
     older: 'Mais antiga',
+    hideTimeline: 'Ocultar cronologia',
+    showTimeline: 'Mostrar cronologia',
     timeline: 'Cronologia',
     current: 'atual',
     empty: 'Este registo não tem histórico.',

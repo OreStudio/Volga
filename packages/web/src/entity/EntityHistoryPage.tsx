@@ -51,6 +51,14 @@ export function EntityHistoryPage({
   // Newest first, so the default selection is the two most recent versions.
   const [selected, setSelected] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  /*
+   * The comparison is the subject; the list supports it.
+   *
+   * Beside each other they compete, and a list of a hundred versions takes width
+   * from the thing being read. Collapsing hands the comparison the whole page,
+   * and a person steps through versions with the keys or the arrows either way.
+   */
+  const [timelineShown, setTimelineShown] = useState(true);
 
   /*
    * One row per history entry.
@@ -109,6 +117,25 @@ export function EntityHistoryPage({
         <p className="mt-1 text-sm text-ink-muted">{t('history.description')}</p>
       </header>
 
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTimelineShown((shown) => !shown)}
+          className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+        >
+          <svg viewBox="0 0 16 16" className="size-3" aria-hidden>
+            <path
+              d={timelineShown ? 'M10 4L6 8l4 4' : 'M6 4l4 4-4 4'}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+          {timelineShown ? t('history.hideTimeline') : t('history.showTimeline')}
+        </button>
+      </div>
+
       {loading ? (
         <p className="text-sm text-ink-faint">{t('entity.loading')}</p>
       ) : entries.length === 0 ? (
@@ -122,8 +149,13 @@ export function EntityHistoryPage({
          * most to compare — the reader loses the thing they are reading in order
          * to move between the things they are reading it against.
          */
-        <div className="grid gap-5 lg:h-[calc(100vh-15rem)] lg:grid-cols-[minmax(220px,300px)_1fr]">
-          <section className="flex min-h-0 flex-col">
+        <div
+          className={cx(
+            'grid gap-5 lg:h-[calc(100vh-15rem)]',
+            timelineShown ? 'lg:grid-cols-[minmax(170px,210px)_1fr]' : 'lg:grid-cols-1',
+          )}
+        >
+          <section className={cx('min-h-0 flex-col', timelineShown ? 'flex' : 'hidden')}>
             <div className="mb-2 flex items-center gap-2">
               <h2 className="text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
               {/*
