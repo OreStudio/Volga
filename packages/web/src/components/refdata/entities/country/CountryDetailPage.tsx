@@ -183,6 +183,16 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
     });
   }
 
+  /*
+   * What the breadcrumb calls this page, above every return.
+   *
+   * It was below the not-found return, so a render that found the record ran one
+   * more hook than a render that did not — and React refuses that outright. The
+   * screen went blank at the moment it had something to show, which is the worst
+   * possible moment for it.
+   */
+  usePageCrumbLabel(mode === 'create' ? undefined : String(values['name'] ?? ''));
+
   if (mode === 'read' && query.isSuccess && current === undefined) {
     return (
       <div className="mx-auto max-w-[680px] px-5 py-16 text-center">
@@ -196,10 +206,6 @@ export function CountryDetailPage({ mode }: { readonly mode: DetailMode }): Reac
     mode === 'create'
       ? t('country.newTitle')
       : String(values['name'] ?? '') || t('country.singular');
-
-  // What the breadcrumb calls this page. The name is what a person recognises,
-  // and only this screen has loaded it.
-  usePageCrumbLabel(mode === 'create' ? undefined : String(values['name'] ?? ''));
 
   return (
     <>

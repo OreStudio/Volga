@@ -293,7 +293,16 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         username: outcome.username,
         email: outcome.email,
         accountId: outcome.accountId,
-        tenantId: outcome.kind === 'active' ? outcome.tenantId : '',
+        /*
+         * The tenant from the login, whether or not a party has been chosen yet.
+         *
+         * It is on both outcomes, and discarding it for the party-choice case
+         * left the session with no tenant at all until one was picked — and
+         * picking one did not put it back. Every write from such an account then
+         * carried an empty tenant, which the service cannot even decode, so the
+         * failure arrived as a bad request with nothing to say what was wrong.
+         */
+        tenantId: outcome.tenantId,
         tenantName: outcome.tenantName,
         availableParties: outcome.availableParties,
         accessLifetimeSeconds: outcome.accessLifetimeSeconds,
@@ -447,7 +456,15 @@ export function buildServer(dependencies: ServerDependencies): FastifyInstance {
         changeReasonCode: body.reason,
         changeCommentary: body.commentary,
       }),
-      tenant_id: body.data.tenant_id.length > 0 ? body.data.tenant_id : session.tenantId,
+      /*
+       * Always the session's tenant, never the client's.
+       *
+       * The tenant is a security boundary: the service overwrites it from the
+       * request context and never trusts the client, and the interface must not
+       * appear to be choosing one. A client that sends its own is either echoing
+       * back what it was given or mistaken, and neither is a reason to believe it.
+       */
+      tenant_id: session.tenantId,
       // Same reasoning as the tenant: the service stamps the real time, so this
       // only has to be a timestamp the decoder accepts, and an empty string is
       // not one.
