@@ -51,14 +51,7 @@ export function EntityHistoryPage({
   // Newest first, so the default selection is the two most recent versions.
   const [selected, setSelected] = useState(0);
   const [showAll, setShowAll] = useState(false);
-  /*
-   * The comparison is the subject; the list supports it.
-   *
-   * Beside each other they compete, and a list of a hundred versions takes width
-   * from the thing being read. Collapsing hands the comparison the whole page,
-   * and a person steps through versions with the keys or the arrows either way.
-   */
-  const [timelineShown, setTimelineShown] = useState(true);
+
 
   /*
    * One row per history entry.
@@ -87,6 +80,22 @@ export function EntityHistoryPage({
       return true;
     });
   }, [versions, meta.columns]);
+
+  /*
+   * A window of versions rather than all of them.
+   *
+   * A hundred versions in a list is a scrollbar again, just a taller one: the
+   * arrows would walk to the end of the visible few and then a person is back to
+   * dragging a thumb. Showing a fixed handful and letting the arrows move the
+   * window means every version is two keys away however many there are.
+   *
+   * Derived from the selection rather than remembered, so the window and the
+   * selection cannot disagree.
+   */
+  const WINDOW = 7;
+  const half = Math.floor(WINDOW / 2);
+  const windowStart = Math.max(0, Math.min(entries.length - WINDOW, selected - half));
+  const windowed = entries.slice(windowStart, windowStart + WINDOW);
 
   const older = entries[selected + 1];
   const newer = entries[selected];
@@ -117,25 +126,6 @@ export function EntityHistoryPage({
         <p className="mt-1 text-sm text-ink-muted">{t('history.description')}</p>
       </header>
 
-      <div className="mb-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setTimelineShown((shown) => !shown)}
-          className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
-        >
-          <svg viewBox="0 0 16 16" className="size-3" aria-hidden>
-            <path
-              d={timelineShown ? 'M10 4L6 8l4 4' : 'M6 4l4 4-4 4'}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
-          {timelineShown ? t('history.hideTimeline') : t('history.showTimeline')}
-        </button>
-      </div>
-
       {loading ? (
         <p className="text-sm text-ink-faint">{t('entity.loading')}</p>
       ) : entries.length === 0 ? (
@@ -158,14 +148,17 @@ export function EntityHistoryPage({
          * the reader is looking while the list moves past it.
          */
         <div
-          className={cx(
-            'grid items-start gap-5',
-            timelineShown ? 'lg:grid-cols-[minmax(170px,210px)_1fr]' : 'lg:grid-cols-1',
-          )}
+          className="grid items-start gap-5 lg:grid-cols-[minmax(170px,210px)_1fr]"
         >
-          <section className={cx('flex-col', timelineShown ? 'flex' : 'hidden')}>
+          <section>
             <div className="mb-2 flex items-center gap-2">
-              <h2 className="text-sm font-medium text-ink-muted">{t('history.timeline')}</h2>
+              <h2 className="text-sm font-medium text-ink-muted">
+                {t('history.timeline')}
+                {/* A window hides the rest, so it says how much there is. */}
+                <span className="ml-1.5 font-normal tabular-nums text-ink-faint">
+                  {selected + 1}/{entries.length}
+                </span>
+              </h2>
               {/*
                 Stepping, because a scrollbar makes a person hunt.
                 Going from v12 to v11 by aiming at a scrollbar is work; by
@@ -204,7 +197,9 @@ export function EntityHistoryPage({
               aria-label={t('history.timeline')}
               className="space-y-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              {entries.map((version, index) => (
+              {windowed.map((version, offset) => {
+                const index = windowStart + offset;
+                return (
                 // Keyed by the same identity the deduplication uses: a version
                 // alone can legitimately appear twice, once per life of the
                 // record after a delete and a re-create.
@@ -248,7 +243,8 @@ export function EntityHistoryPage({
                     )}
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ol>
           </section>
 
